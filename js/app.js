@@ -280,7 +280,7 @@ async function arrancar() {
     : crearApiReal(CONFIG);
   registrarServiceWorker();
   if (!st.api) {
-    st.mensaje = { texto: mensajeError('CONFIG') + ' Para verla con datos ficticios, abre ?demo=1.' };
+    st.mensaje = { texto: mensajeError('CONFIG') };
     st.api = { tieneSesion: () => false, ingresar: async () => { throw Object.assign(new Error(), { codigo: 'CONFIG' }); }, recuperar: async () => {}, salir: async () => {}, capacidades: {} };
     ir('ingreso'); pintar(); return;
   }

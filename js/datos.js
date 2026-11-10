@@ -135,7 +135,7 @@ export function mensajeError(codigo) {
     case 'CREDENCIALES': return 'No pudimos ingresar. Revisa tu correo y tu contraseña.';
     case 'ENLACE': return 'El enlace ya no es válido o venció. Pide uno nuevo a tu equipo Contadoor o usa "¿Olvidaste tu contraseña?".';
     case 'RED': return 'No hay conexión. Revisa tu internet e inténtalo de nuevo.';
-    case 'CONFIG': return 'MiContadoor aún no está configurado en este sitio.';
+    case 'CONFIG': return 'MiContadoor estará disponible muy pronto. Te avisaremos cuando tu cuenta esté lista.';
     default: return 'Algo no salió bien. Inténtalo de nuevo en unos minutos.';
   }
 }
