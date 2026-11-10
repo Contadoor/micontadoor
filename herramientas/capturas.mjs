@@ -49,7 +49,12 @@ async function foto(nombre, ancho, alto, movil, url, completa, oscuro) {
   await cmd('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: oscuro ? 'dark' : 'light' }] });
   await cmd('Page.navigate', { url: 'about:blank' }); await espera(100);
   await cmd('Page.navigate', { url }); await espera(1800);
-  const r = await cmd('Page.captureScreenshot', { format: 'png', captureBeyondViewport: !!completa });
+  if (completa) {   // página completa: se agranda la ventana al alto real (así la barra inferior queda al pie, no en medio)
+    const h = (await cmd('Runtime.evaluate', { expression: 'document.documentElement.scrollHeight', returnByValue: true })).result.value;
+    await cmd('Emulation.setDeviceMetricsOverride', { width: ancho, height: Math.max(alto, h), deviceScaleFactor: movil ? 2 : 1, mobile: movil });
+    await espera(400);
+  }
+  const r = await cmd('Page.captureScreenshot', { format: 'png' });
   writeFileSync(join(OUT, nombre + '.png'), Buffer.from(r.data, 'base64'));
 }
 

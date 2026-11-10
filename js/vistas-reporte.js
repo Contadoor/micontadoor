@@ -74,7 +74,7 @@ export function vReporte(ctx) {
   const mes = mesDe(rep.periodo);
   const hayAnt = acu.anteriores.length > 0;
   const top = hayAnt
-    ? html`<div class="card osc"><div class="hd"><h2>Total a pagar</h2><span class="chip c-ok-d">Confirmado</span></div><div class="big">${clp(acu.total)}</div>
+    ? html`<div class="card osc"><div class="hd"><h2>Total a pagar</h2>${acu.incompleto ? html`<span class="chip c-pend">Falta confirmar</span>` : html`<span class="chip c-ok-d">Confirmado</span>`}</div><div class="big">${clp(acu.total)}</div>
         <div class="sm">Este mes ${clp(acu.totalMes)} + pendientes acumulados ${clp(acu.totalAnteriores)} (${listaMeses(acu.origenes)})${acu.incompleto ? ' · más los montos por confirmar' : ''}</div></div>`
     : html`<div class="card osc"><div class="hd"><h2>Lo que pagas por ${mes}</h2><span class="chip c-ok-d">Confirmado</span></div>
         <div class="big">${clp(rep.pagado ? rep.total_pagado_mes : acu.totalMes)}</div>

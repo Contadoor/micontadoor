@@ -263,3 +263,4 @@ a.btn{color:#fff}
   .tabs button:hover{color:var(--m)}
   .hoja .opc:hover{border-color:var(--m)}
 }
+.kpi-btn .hd{flex-wrap:wrap}.kpi-btn .hd b{white-space:nowrap}
