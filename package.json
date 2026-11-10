@@ -1,0 +1,13 @@
+{
+  "name": "micontadoor-pwa",
+  "version": "1.0.0-borrador",
+  "private": true,
+  "type": "module",
+  "description": "MiContadoor V1: portal de clientes de Contadoor (PWA estática).",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "verificar": "node herramientas/verificar.mjs",
+    "servir": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "capturas": "node herramientas/capturas.mjs"
+  }
+}
