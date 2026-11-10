@@ -89,6 +89,7 @@ Contrato que usa la app hoy (MC-1 R2, worktree `gestoor-backend-mc1`, **no insta
 | `mc.mi_sesion()` | Cuenta, términos pendientes y empresas (`ref`, `razon_social`, `rut`, `rol`, `plan_nivel`). Activa la cuenta invitada en el primer ingreso. |
 | `mc.empresa_resumen(p_ref)` | Secciones: `{disponible:false}`, `{sin_permiso:true}` o `{bloqueada:true, mejora:'comercial'}`. Hoy no trae datos, así que cada pantalla muestra su estado vacío ("aún no publicado"). |
 | `mc.aceptar_terminos(p_version)` | Pantalla de términos. |
+| `mc.trabajos(p_ref, p_codigo?)` (MC-5) | Trabajos especiales: etapa, avance, pasos con texto para el cliente, próximo paso, pago por cuotas (según permisos) y documentos. |
 
 Pasos, en orden y cada uno con su GO:
 
@@ -106,7 +107,7 @@ Pasos, en orden y cada uno con su GO:
    - Bucket privado para el comprobante, con subida firmada. Hoy la app solo valida el archivo (PDF/JPG/PNG de hasta 5 MB) y todavía no lo sube.
    - Agregar el host de Storage en `HOSTS_DOCUMENTOS` y en `connect-src`.
 7. **MC-4 Pre-IVA / Pre-Renta:** fotos que publica el analista, con su estado.
-8. **MC-5 Trabajos especiales:** `mc.v_trabajos` y pasos con `texto_cliente`.
+8. **MC-5 Trabajos especiales (rama `feat/mc5-trabajos`, backend `sql/micontadoor-mc5`, NO instalado):** RPC `mc.trabajos(p_ref, p_codigo?)` sobre vistas internas en lista blanca (`mc.v_trabajos`, `mc.v_trabajo_pasos` solo con `texto_cliente`, cuotas, factura de producción y documentos marcados para el cliente). La app la llama después de `empresa_resumen` (`CONFIG.RPC.TRABAJOS`) y reemplaza la sección `trabajos` con `normalizarTrabajos()` (`js/datos.js`). Sin "Mi cuenta" en el vínculo no llega ningún monto; sin facturas, no llega el folio. Si la RPC falla, la pantalla muestra un aviso, nunca datos. Si MC-5 aún no está instalado al publicar, dejar `RPC.TRABAJOS = null`. La descarga de PDF de los documentos queda para la Edge `mc-documento-url` (otra etapa): hoy dice «PDF próximamente».
 9. **MC-6 Avisos** (fuera de la V1): VAPID `MC_VAPID_*`, `mc.push_suscripciones` y `mc-push-send`. Activar `js/push.js` y el bloque comentado de `sw.js`.
 10. **Brechas del contrato que conviene cerrar:**
     - `plan_nombre` en `empresa_resumen`. Hoy "basico" se muestra como "Cumplimiento" y "pro" como "Contadoor PRO", aunque sea Estratégico.

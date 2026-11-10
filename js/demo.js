@@ -97,15 +97,21 @@ const DATOS = {
     },
     pre_iva: PREIVA,
     pre_renta: PRERENTA,
+    // Forma EXACTA de mc.trabajos (MC-5): la app la pasa por normalizarTrabajos(), igual que con el servidor real.
     trabajos: {
       activos: [{
-        codigo: 'TE-2026-041', estado: 'En ejecución', servicio: 'Modificación de sociedad', responsable: 'Tu especialista en Formalización y Sociedades',
-        avance: 65,
-        pasos: [{ t: 'Revisión de antecedentes', e: 'ok' }, { t: 'Redacción de la escritura', e: 'ok' }, { t: 'Firma en notaría', e: 'act' },
-          { t: 'Inscripción en el Conservador', e: '' }, { t: 'Publicación en el Diario Oficial', e: '' }],
-        proximo: 'Firma en la notaría. Te avisaremos el día y la hora.',
-        pago: { total: 540000, cuotas: 3, pagado: 360000, pagado_xs: 'cuotas 1 y 2', pendiente: 180000, pendiente_xs: 'cuota 3 · vence 05-12' },
-        documentos: [{ t: 'Cotización aceptada', fecha: '2026-10-02' }, { t: 'Borrador de escritura', fecha: '2026-10-28' }],
+        codigo: 'TE-2026-041', servicio: 'Modificación de sociedad', etapa: 'en_curso', estado: 'En ejecución', avance: 65, responsable: null,
+        aceptado_el: '2026-10-02', iniciado_el: '2026-10-06', terminado_el: null, cerrado: false,
+        pasos: [{ t: 'Revisión de antecedentes', e: 'ok', fecha: '2026-10-09' }, { t: 'Redacción de la escritura', e: 'ok', fecha: '2026-10-28' },
+          { t: 'Firma en notaría', e: 'act', fecha: null }, { t: 'Inscripción en el Conservador', e: '', fecha: null }, { t: 'Publicación en el Diario Oficial', e: '', fecha: null }],
+        proximo: 'Firma en notaría',
+        pago: { total: 540000, cuotas_total: 3, pagado: 360000, pendiente: 180000, vencido: 0,
+          cuotas: [{ n: 1, monto: 180000, vence: '2026-10-05', estado: 'pagada', pagada_el: '2026-10-04' },
+            { n: 2, monto: 180000, vence: '2026-11-05', estado: 'pagada', pagada_el: '2026-11-04' },
+            { n: 3, monto: 180000, vence: '2026-12-05', estado: 'por_pagar', pagada_el: null }],
+          factura: { folio: '16.430', emitida_el: '2026-10-02' } },
+        documentos: [{ t: 'Cotización aceptada', fecha: '2026-10-02', tipo: 'aceptacion' }, { t: 'Borrador de escritura', fecha: '2026-10-28', tipo: 'paso' }],
+        documentos_retenidos: false,
       }],
       terminados: 2,
     },
@@ -188,6 +194,7 @@ const DATOS = {
 };
 
 const clon = (x) => JSON.parse(JSON.stringify(x));
+const rolDe = (e, opciones) => (opciones.rol === 'consulta' ? 'consulta' : e.rol);
 
 export const demo = {
   refs: REF,
@@ -198,7 +205,7 @@ export const demo = {
   resumen(ref, opciones = {}) {
     const e = EMPRESAS.find((x) => x.ref === ref);
     if (!e) return null;
-    const rol = opciones.rol === 'consulta' ? 'consulta' : e.rol;
+    const rol = rolDe(e, opciones);
     const nivel = opciones.plan === 'cumpl' ? 'basico' : e.plan_nivel;
     const d = clon(DATOS[ref]);
     const verCuenta = rol === 'titular'; const verFact = rol === 'titular';   // D2: valores por defecto del vínculo
@@ -216,10 +223,22 @@ export const demo = {
         reporte: sec(d.reporte),
         mi_cuenta: verCuenta ? sec(d.mi_cuenta) : { sin_permiso: true },
         facturas: verFact ? { disponible: false } : { sin_permiso: true },
-        trabajos: sec(d.trabajos),
+        trabajos: { disponible: false },   // como el servidor: empresa_resumen no trae trabajos; vienen de mc.trabajos (demo.trabajos)
         pre_iva: nivel === 'pro' ? sec(d.pre_iva) : bloq,
         pre_renta: nivel === 'pro' ? sec(d.pre_renta) : bloq,
       },
     };
+  },
+  /** Igual que mc.trabajos (MC-5): mismas omisiones D2 (sin Mi cuenta → pago {sin_permiso:true}; sin facturas → factura {sin_permiso:true}). */
+  trabajos(ref, opciones = {}) {
+    const e = EMPRESAS.find((x) => x.ref === ref);
+    if (!e) return null;
+    const verCuenta = rolDe(e, opciones) === 'titular'; const verFact = verCuenta;
+    const d = clon(DATOS[ref].trabajos || { activos: [], terminados: 0 });
+    for (const t of d.activos) {
+      if (!verCuenta) t.pago = { sin_permiso: true };
+      else if (!verFact) t.pago.factura = { sin_permiso: true };
+    }
+    return { ok: true, ref, seccion: { disponible: true, datos: d } };
   },
 };

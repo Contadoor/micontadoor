@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos } from './datos.js';
 import { html, urlSegura, CORREO } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
@@ -143,7 +143,14 @@ async function cargar(destino) {
 }
 
 async function cargarResumen() {
-  st.resumen = await st.api.resumen(st.empresa.ref);
+  let r = await st.api.resumen(st.empresa.ref);
+  // MC-5: los trabajos especiales vienen de su propia RPC (mc.trabajos). Si falla, la sección muestra un error (nunca datos falsos);
+  // una sesión inválida o un bloqueo sí cortan todo, como en el resto de la app.
+  if (st.api.trabajos && permisos(r).verTrabajos) {
+    try { const t = await st.api.trabajos(st.empresa.ref); if (t) r = conTrabajos(r, t); }
+    catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; r = conTrabajos(r, 'error'); }
+  }
+  st.resumen = r;
   st.perm = permisos(st.resumen);
   st.cargadoAt = Date.now();
   escribir('mc_empresa', st.empresa.ref);

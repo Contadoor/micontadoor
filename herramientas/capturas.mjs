@@ -38,6 +38,7 @@ const CEL = [
   ['16_cumplimiento_prerenta_bloqueada', '&empresa=2', 'prerenta'], ['17_cumplimiento_mi_plan', '&empresa=2', 'mas'],
   ['18_usuario_adicional_inicio', '&empresa=3', 'inicio'], ['19_usuario_adicional_mi_cuenta', '&empresa=3', 'cuenta'],
   ['20_mi_cuenta_por_pagar_cumplimiento', '&empresa=2', 'cuenta'],
+  ['24_trabajos_usuario_adicional', '&empresa=1&rol=consulta', 'trabajos'],
   ['21_activar_contrasena', '', 'activar'], ['22_recuperar', '', 'recuperar'], ['23_terminos', '&terminos=1', 'inicio'],
 ];
 const WEB = [['01_ingreso', '', 'ingreso'], ['02_inicio', '&empresa=1', 'inicio'], ['03_reporte_con_pendientes', '&empresa=2', 'reporte'],

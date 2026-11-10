@@ -95,20 +95,27 @@ export function vPreRenta(ctx) {
 }
 
 export function vTrabajos(ctx) {
+  const sec = ctx.resumen?.secciones?.trabajos;
   const d = datosDe(ctx.resumen, 'trabajos');
   const act = d?.activos || [];
+  if (sec?.error) {
+    return html`${sub('Trabajos especiales', { volver: 'mas' })}<div class="sec">
+      ${vacio(I.llave, 'No pudimos cargar tus trabajos especiales', 'Inténtalo de nuevo en unos minutos. Si sigue igual, escríbenos.')}${waCard(ctx.waEquipo)}</div>`;
+  }
   return html`${sub('Trabajos especiales', { volver: 'mas' })}<div class="sec">
     ${act.length ? act.map((t) => html`<div class="card"><div class="hd"><span class="chip c-conc">${t.codigo}</span><span class="chip c-rev">${t.estado}</span></div>
-      <h3 class="mt8">${t.servicio}</h3><div class="sm">A cargo de: ${t.responsable}</div>
-      <div class="prog mt12"><i data-w="${pct(t.avance)}"></i></div><div class="xs mt8">Avance ${pct(t.avance)} %</div>
-      <ul class="pasos-te">${(t.pasos || []).map((p) => html`<li class="${p.e === 'ok' ? 'ok' : p.e === 'act' ? 'act' : ''}"><span class="bol" aria-hidden="true">${p.e === 'ok' ? I.checkG : ''}</span><span>${p.t}${p.e === 'act' ? ' · ahora' : ''}</span></li>`)}</ul>
+      <h3 class="mt8">${t.servicio}</h3><div class="sm">A cargo de: ${t.responsable || 'tu equipo Contadoor'}</div>
+      ${t.avance === null ? html`<div class="xs mt8">El avance se informa cuando el trabajo comienza.</div>`
+        : html`<div class="prog mt12"><i data-w="${pct(t.avance)}"></i></div><div class="xs mt8">Avance ${pct(t.avance)} %</div>`}
+      ${t.pasos?.length ? html`<ul class="pasos-te">${t.pasos.map((p) => html`<li class="${p.e === 'ok' ? 'ok' : p.e === 'act' ? 'act' : ''}"><span class="bol" aria-hidden="true">${p.e === 'ok' ? I.checkG : ''}</span><span>${p.t}${p.e === 'act' ? ' · ahora' : ''}</span></li>`)}</ul>` : ''}
       ${t.proximo ? html`<div class="nota mt8 mb0">Próximo paso: ${t.proximo}</div>` : ''}</div>
       ${t.pago ? html`<div class="card"><h3 class="t15">Pago del trabajo</h3>
-        <div class="fila"><div class="t"><b>Valor total</b><span class="xs">${t.pago.cuotas} cuotas</span></div><div class="v"><b>${clp(t.pago.total)}</b></div></div>
-        <div class="fila"><div class="t"><b>Pagado</b><span class="xs">${t.pago.pagado_xs}</span></div><div class="v"><b>${clp(t.pago.pagado)}</b><span class="chip c-conc">Conciliado</span></div></div>
-        <div class="fila"><div class="t"><b>Pendiente</b><span class="xs">${t.pago.pendiente_xs}</span></div><div class="v"><b>${clp(t.pago.pendiente)}</b><span class="chip c-pend">Por pagar</span></div></div>
+        <div class="fila"><div class="t"><b>Valor total</b><span class="xs">${t.pago.cuotas === 1 ? 'pago único' : html`${t.pago.cuotas} cuotas`}${t.pago.folio ? html` · factura N° ${t.pago.folio}` : ''}</span></div><div class="v"><b>${clp(t.pago.total)}</b></div></div>
+        <div class="fila"><div class="t"><b>Pagado</b><span class="xs">${t.pago.pagado_xs}</span></div><div class="v"><b>${clp(t.pago.pagado)}</b>${t.pago.pagado > 0 ? html`<span class="chip c-conc">Conciliado</span>` : ''}</div></div>
+        ${t.pago.pendiente > 0 ? html`<div class="fila"><div class="t"><b>Pendiente</b><span class="xs">${t.pago.pendiente_xs}</span></div><div class="v"><b>${clp(t.pago.pendiente)}</b><span class="chip ${t.pago.vencido > 0 ? 'c-venc' : 'c-pend'}">${t.pago.vencido > 0 ? 'Vencido' : 'Por pagar'}</span></div></div>` : ''}
         ${ctx.perm.verMiCuenta ? html`<button type="button" class="btn lin" data-ir="cuenta">Ver en mi estado de cuenta</button>` : ''}</div>` : ''}
-      ${t.documentos?.length ? html`<div class="card"><h3 class="t15">Documentos del trabajo</h3>${t.documentos.map((x) => html`<div class="fila"><div class="t"><b>${x.t}</b><span class="xs">${fecha(x.fecha)}</span></div>${ctx.enlaceDoc(x.url) ? html`<a href="${ctx.enlaceDoc(x.url)}" target="_blank" rel="noopener noreferrer">PDF</a>` : html`<span class="xs">PDF próximamente</span>`}</div>`)}</div>` : ''}`)
+      ${t.documentos?.length || t.documentos_retenidos ? html`<div class="card"><h3 class="t15">Documentos del trabajo</h3>${(t.documentos || []).map((x) => html`<div class="fila"><div class="t"><b>${x.t}</b><span class="xs">${fecha(x.fecha)}</span></div>${ctx.enlaceDoc(x.url) ? html`<a href="${ctx.enlaceDoc(x.url)}" target="_blank" rel="noopener noreferrer">PDF</a>` : html`<span class="xs">PDF próximamente</span>`}</div>`)}
+        ${t.documentos_retenidos ? html`<p class="xs mt8">Los documentos finales estarán disponibles aquí al completar la entrega.</p>` : ''}</div>` : ''}`)
       : vacio(I.llave, 'No tienes trabajos especiales en curso', '¿Necesitas una constitución, modificación u otro trámite? Escríbenos y te cotizamos.')}
     ${d?.terminados ? html`<p class="xs c">Trabajos terminados: ${d.terminados}</p>` : ''}
     ${act.length ? '' : waCard(ctx.waEquipo)}</div>`;

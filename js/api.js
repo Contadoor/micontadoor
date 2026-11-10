@@ -97,6 +97,13 @@ export function crearApiReal(cfg) {
     async sesion() { const n = normalizarSesion(await rpc(cfg.RPC.SESION)); if (!n.ok) throw new ErrorApi(n.codigo); return n; },
     async resumen(ref) { if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO'); return rpc(cfg.RPC.RESUMEN, { p_ref: ref }); },
     async aceptarTerminos(v) { return rpc(cfg.RPC.TERMINOS, { p_version: v }); },
+    /** MC-5: trabajos especiales de la empresa (o uno solo por código). null si la RPC no está configurada. */
+    async trabajos(ref, codigo = null) {
+      if (!cfg.RPC.TRABAJOS) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      if (codigo !== null && !/^TE-\d{4}-\d{3,6}$/.test(String(codigo))) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.TRABAJOS, { p_ref: ref, p_codigo: codigo });
+    },
     async solicitudPago(datos) {
       if (!cfg.RPC.SOLICITUD_PAGO) throw new ErrorApi('NO_DISPONIBLE');
       // Contrato por definir en MC-3 (crea tarea a Conciliación/analista; NUNCA marca el pago). El comprobante irá a Storage.
@@ -126,6 +133,11 @@ export function crearApiDemo(demo, opciones = {}) {
       return espera(r);
     },
     async aceptarTerminos() { terminos = false; return { ok: true }; },
+    async trabajos(ref) {
+      const r = demo.trabajos(ref, opciones);
+      if (!r) throw new ErrorApi('MC_SIN_ACCESO');
+      return espera(r);
+    },
     async solicitudPago() { if (opciones.solicitudes !== true) throw new ErrorApi('NO_DISPONIBLE'); return espera({ ok: true }); },
   };
 }
