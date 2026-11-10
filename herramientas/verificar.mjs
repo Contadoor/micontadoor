@@ -2,9 +2,10 @@
 // Uso: node herramientas/verificar.mjs   (sale con código 1 si hay un problema)
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CONFIG } from '../js/config.js';
 
-const RAIZ = new URL('..', import.meta.url).pathname;
+const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 const problemas = []; const avisos = [];
 const archivos = [];
 (function rec(d) {
