@@ -130,7 +130,7 @@ export function vMas(ctx) {
     </div>
     <div class="card"><div class="hd"><h3>Apariencia</h3></div><div class="sm">Elige cómo prefieres ver MiContadoor.</div>
       <div class="seg mb0 mt8" role="radiogroup" aria-label="Apariencia">${[['claro', 'Claro'], ['oscuro', 'Oscuro'], ['auto', 'Automático']].map(([v, t]) =>
-        html`<button type="button" role="radio" data-tema="${v}" aria-checked="${ctx.tema === v}">${t}</button>`)}</div>
+        html`<button type="button" role="radio" data-apariencia="${v}" aria-checked="${ctx.tema === v}">${t}</button>`)}</div>
       <div class="xs mt8">"Automático" sigue la configuración de tu celular.</div></div>
     ${waCard(ctx.waEquipo)}
     <div class="marca-pie"><img class="logo-cla" src="/img/contadoor_lockup_glossy.png" alt="Contadoor" width="170" height="38"><img class="logo-osc" src="/img/contadoor_lockup_white.png" alt="Contadoor" width="170" height="70"></div>

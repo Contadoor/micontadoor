@@ -1,7 +1,7 @@
 // MiContadoor · service worker. Cachea SOLO los archivos propios de la app (esqueleto). NUNCA datos:
 // · toda petición a otro origen (Supabase, fuentes, WhatsApp) pasa directo a la red, sin tocar la caché;
-// · dentro del propio sitio solo se responde desde caché lo que está en la lista ESQUELETO.
-const VERSION = 'mc-v1.0.0-borrador-1';
+// · dentro del propio sitio solo se guarda lo que está en la lista ESQUELETO, y se usa SOLO sin conexión (red primero).
+const VERSION = 'mc-v1.0.0-borrador-2';
 const ESQUELETO = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/api.js', '/js/config.js', '/js/datos.js', '/js/demo.js', '/js/iconos.js', '/js/push.js', '/js/util.js',
@@ -27,7 +27,11 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (!ESQUELETO.includes(url.pathname)) return;
-  e.respondWith(caches.match(url.pathname).then((r) => r || fetch(req)));
+  // Red primero (siempre la versión publicada más nueva); la copia guardada solo sirve sin conexión.
+  e.respondWith(fetch(req).then((r) => {
+    if (r.ok) { const copia = r.clone(); caches.open(VERSION).then((c) => c.put(url.pathname, copia)); }
+    return r;
+  }).catch(() => caches.match(url.pathname)));
 });
 
 // ── Avisos push: preparado, APAGADO en la V1 (MC-6). Al activarlo, el texto visible es siempre genérico. ──

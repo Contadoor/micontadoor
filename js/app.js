@@ -151,8 +151,8 @@ async function cargarResumen() {
 
 // ── Eventos ───────────────────────────────────────────────────────────────────────────────────────────────────
 document.addEventListener('click', async (ev) => {
-  const t = ev.target.closest('[data-tema]');
-  if (t) { aplicarTema(t.dataset.tema); pintar(); return; }
+  const t = ev.target.closest('button[data-apariencia]');
+  if (t) { aplicarTema(t.dataset.apariencia); pintar(); return; }
   const b = ev.target.closest('[data-ir]');
   if (b) { ev.preventDefault(); st.hoja = null; ir(b.dataset.ir); return; }
   const a = ev.target.closest('[data-accion]');
