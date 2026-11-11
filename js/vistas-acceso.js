@@ -38,13 +38,17 @@ export function vRecuperar({ mensaje }) {
     </form>${pie}</section>`;
 }
 
-export function vActivar({ tipo, mensaje, listo }) {
+export function vActivar({ tipo, mensaje, listo, pendiente }) {
   const recuperacion = tipo === 'recovery';
   return html`<section class="oscura" aria-label="Crear contraseña">${barras}
     <div class="rel">${iconoB(64, 'app', 'gB0')}</div>
     <h1>${recuperacion ? 'Crea tu nueva contraseña' : 'Activa tu acceso: crea tu contraseña'}</h1>
     <p class="intro">Usa al menos 10 caracteres, con letras y números. No la compartas con nadie, ni siquiera con Contadoor.</p>
-    ${listo ? html`<form>${msg(mensaje)}<a class="btn" href="#/inicio">Entrar a MiContadoor</a></form>` : html`
+    ${pendiente ? html`<form data-form="continuar" novalidate>
+      <p class="xs m0">Por tu seguridad, el enlace se usa recién cuando tocas «Continuar».</p>
+      ${msg(mensaje)}
+      <button type="submit" class="btn">Continuar</button>
+    </form>` : listo ? html`<form>${msg(mensaje)}<a class="btn" href="#/inicio">Entrar a MiContadoor</a></form>` : html`
     <form data-form="activar" novalidate>
       <label>Contraseña nueva<input name="a" type="password" autocomplete="new-password" minlength="10" maxlength="72" required></label>
       <label>Repite la contraseña<input name="b" type="password" autocomplete="new-password" minlength="10" maxlength="72" required enterkeyhint="done"></label>

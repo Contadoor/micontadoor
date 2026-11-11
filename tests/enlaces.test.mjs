@@ -15,6 +15,10 @@ const ini = fuente.indexOf('async function tomarEnlace()');
 const fin = fuente.indexOf('\n}\n', ini);
 assert.ok(ini > 0 && fin > ini, 'no se encontró tomarEnlace() en js/app.js');
 const codigoTomarEnlace = fuente.slice(ini, fin + 2);
+const ini2 = fuente.indexOf('async function continuarEnlace()');
+const fin2 = fuente.indexOf('\n}\n', ini2);
+assert.ok(ini2 > 0 && fin2 > ini2, 'no se encontró continuarEnlace() en js/app.js');
+const codigoContinuar = fuente.slice(ini2, fin2 + 2);
 
 const TH = 'a'.repeat(56);   // forma de un token_hash de GoTrue: sha224 en hexadecimal (56 caracteres)
 
@@ -37,51 +41,75 @@ function entorno(url, { verificar } = {}) {
     mensajeError,
   };
   vm.createContext(ctx);
-  vm.runInContext(codigoTomarEnlace + '\n;globalThis.tomarEnlace = tomarEnlace;', ctx);
-  return { ctx, llamadas, historial, correr: () => ctx.tomarEnlace() };
+  vm.runInContext(codigoTomarEnlace + '\n' + codigoContinuar + '\n;globalThis.tomarEnlace = tomarEnlace; globalThis.continuarEnlace = continuarEnlace;', ctx);
+  return { ctx, llamadas, historial, correr: () => ctx.tomarEnlace(), continuar: () => ctx.continuarEnlace() };
 }
 
-test('enlace de invitación (S2): llama a verificarEnlace(token_hash, "invite") y saca el token de la barra', async () => {
-  const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}&type=invite`);
-  assert.equal(await e.correr(), true);
-  assert.deepEqual(e.llamadas, [['verificarEnlace', TH, 'invite']]);
-  assert.equal(e.ctx.st.tipoEnlace, 'invite');
-  assert.equal(e.ctx.st.mensaje, null);
-  assert.deepEqual(e.historial, ['/#/activar']);                     // sin ?token_hash en la barra ni en el historial
-});
+for (const tipo of ['invite', 'recovery']) {
+  test(`[H-AUTH-1] enlace ${tipo}: al CARGAR no se llama a Auth; el token sale de la barra y queda solo en memoria`, async () => {
+    const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}&type=${tipo}`);
+    assert.equal(await e.correr(), true);
+    assert.deepEqual(e.llamadas, []);                                   // un escáner que abra el enlace NO lo gasta
+    assert.equal(e.ctx.st.tipoEnlace, tipo);
+    assert.deepEqual({ ...e.ctx.st.enlacePendiente }, { th: TH, tipo });
+    assert.equal(e.ctx.st.mensaje, null);
+    assert.deepEqual(e.historial, ['/#/activar']);                     // sin ?token_hash en la barra ni en el historial
+  });
 
-test('enlace de recuperación (S4): llama a verificarEnlace(token_hash, "recovery")', async () => {
-  const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}&type=recovery`);
-  assert.equal(await e.correr(), true);
-  assert.deepEqual(e.llamadas, [['verificarEnlace', TH, 'recovery']]);
-  assert.equal(e.ctx.st.tipoEnlace, 'recovery');
-  assert.deepEqual(e.historial, ['/#/activar']);
-});
+  test(`[H-AUTH-1] enlace ${tipo}: "Continuar" canjea UNA vez con verificarEnlace(token_hash, type)`, async () => {
+    const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}&type=${tipo}`);
+    await e.correr();
+    assert.equal(await e.continuar(), true);
+    assert.deepEqual(e.llamadas, [['verificarEnlace', TH, tipo]]);
+    assert.equal(e.ctx.st.enlacePendiente, null);
+    assert.equal(e.ctx.st.mensaje, null);
+    assert.equal(await e.continuar(), false);                          // segundo clic: ya no hay token en memoria
+    assert.equal(e.llamadas.length, 1);
+    assert.equal(e.ctx.st.mensaje.texto, mensajeError('ENLACE'));
+  });
+}
 
-test('enlace sin type: NO se llama a Auth (tomarEnlace devuelve false y el arranque sigue normal)', async () => {
+test('[H-AUTH-2] enlace SIN type: no llama a Auth, limpia el token de la barra y muestra error neutro', async () => {
   const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}`);
-  assert.equal(await e.correr(), false);
+  assert.equal(await e.correr(), true);
   assert.deepEqual(e.llamadas, []);
-  // Comportamiento actual documentado: la URL NO se limpia en este caso (ver hallazgo H-PWA-2 en R2).
-  assert.deepEqual(e.historial, []);
+  assert.equal(e.ctx.st.enlacePendiente, null);
+  assert.equal(e.ctx.st.mensaje.texto, mensajeError('ENLACE'));
+  assert.deepEqual(e.historial, ['/#/ingreso']);
 });
 
-test('token inválido o vencido (Auth responde error): mensaje ENLACE y vuelta a #/ingreso, sin sesión', async () => {
+test('[H-AUTH-2] type desconocido (magiclink) o type sin token: limpia la barra, error neutro, nunca llama a Auth', async () => {
+  for (const url of [`https://mi.contadoor.cl/?token_hash=${TH}&type=magiclink`, 'https://mi.contadoor.cl/?type=invite', `https://mi.contadoor.cl/?token_hash=${TH}&type=`]) {
+    const e = entorno(url);
+    assert.equal(await e.correr(), true, url);
+    assert.deepEqual(e.llamadas, [], url);
+    assert.equal(e.ctx.st.enlacePendiente, null, url);
+    assert.equal(e.ctx.st.mensaje.texto, mensajeError('ENLACE'), url);
+    assert.deepEqual(e.historial, ['/#/ingreso'], url);
+  }
+});
+
+test('token inválido o vencido (Auth responde error al tocar Continuar): mensaje ENLACE y vuelta a #/ingreso, sin sesión', async () => {
   const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}&type=invite`, {
     verificar: () => { throw Object.assign(new Error('ENLACE'), { codigo: 'ENLACE' }); },
   });
   assert.equal(await e.correr(), true);
+  assert.deepEqual(e.llamadas, []);
+  assert.equal(await e.continuar(), false);
   assert.deepEqual(e.llamadas, [['verificarEnlace', TH, 'invite']]);
   assert.equal(e.ctx.st.mensaje.texto, mensajeError('ENLACE'));
   assert.deepEqual(e.historial, ['/#/activar', '/#/ingreso']);
 });
 
-test('type desconocido (p. ej. magiclink): tomarEnlace lo pasa, pero verificarEnlace real lo rechaza sin red', async () => {
-  const api = crearApiReal({ SUPABASE_URL: 'https://ejemplo.supabase.co', SUPABASE_ANON_KEY: 'clave-publica-de-prueba', RPC: {} });
-  const e = entorno(`https://mi.contadoor.cl/?token_hash=${TH}&type=magiclink`, { verificar: (th, t) => api.verificarEnlace(th, t) });
-  assert.equal(await e.correr(), true);
-  assert.equal(e.ctx.st.tipoEnlace, 'invite');                       // pantalla por defecto…
-  assert.equal(e.ctx.st.mensaje.texto, mensajeError('ENLACE'));       // …pero con error: nunca hay sesión
+test('[H-AUTH-1] la pantalla con enlace pendiente muestra SOLO "Continuar" (sin formulario de contraseña)', async () => {
+  const { vActivar } = await import('../js/vistas-acceso.js');
+  const h = String(vActivar({ tipo: 'invite', mensaje: null, listo: false, pendiente: true }));
+  assert.match(h, /data-form="continuar"/);
+  assert.match(h, />Continuar</);
+  assert.doesNotMatch(h, /data-form="activar"/);
+  const h2 = String(vActivar({ tipo: 'invite', mensaje: null, listo: false, pendiente: false }));
+  assert.match(h2, /data-form="activar"/);
+  assert.doesNotMatch(h2, /data-form="continuar"/);
 });
 
 test('error en el fragmento (#error=access_denied…): mensaje ENLACE sin llamar a Auth', async () => {
