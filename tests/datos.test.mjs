@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { esc, html, raw, clp, urlSegura, fecha, periodoLargo } from '../js/util.js';
-import { permisos, estadoSeccion, datosDe, calcularAcumulado, normalizarSesion, saldoFavorTexto, validarContrasena, planTexto, mensajeError } from '../js/datos.js';
+import { permisos, estadoSeccion, datosDe, calcularAcumulado, normalizarSesion, saldoFavorTexto, validarContrasena, planTexto, mensajeError, normalizarTrabajos, pagoTrabajo, conTrabajos } from '../js/datos.js';
 import { demo } from '../js/demo.js';
 import { crearApiDemo, crearApiReal } from '../js/api.js';
 
@@ -162,4 +162,59 @@ test('"Ya transferí"/"Ya lo pagué": deshabilitados si el contrato no trae la R
 test('api demo: ref ajeno → MC_SIN_ACCESO', async () => {
   const d = crearApiDemo(demo);
   await assert.rejects(d.resumen('00000000-0000-0000-0000-000000000000'), (e) => e.codigo === 'MC_SIN_ACCESO');
+});
+
+// ── Trabajos especiales (MC-5) ────────────────────────────────────────────────────────────────────────────────
+const trab = (t, extra = {}) => ({ ok: true, ref: 'x', seccion: { disponible: true, datos: { activos: [t], terminados: 1, ...extra } } });
+const T = { codigo: 'TE-2026-901', servicio: 'Modificación de sociedad', etapa: 'en_curso', avance: 50, responsable: 'Ana',
+  pasos: [{ t: 'Revisión', e: 'ok' }, { t: 'Firma', e: 'act' }, { t: 'Entrega', e: '' }], proximo: 'Firma',
+  pago: { total: 540000, cuotas_total: 3, pagado: 180000, pendiente: 360000, vencido: 180000,
+    cuotas: [{ n: 1, monto: 180000, vence: '2026-10-05', estado: 'pagada' }, { n: 2, monto: 180000, vence: '2026-11-05', estado: 'vencida' }, { n: 3, monto: 180000, vence: '2026-12-05', estado: 'por_pagar' }],
+    factura: { folio: '16430' } },
+  documentos: [{ t: 'Cotización aceptada', fecha: '2026-10-02' }], documentos_retenidos: false };
+test('normalizarTrabajos: forma del contrato mc.trabajos → pantalla', () => {
+  const s = normalizarTrabajos(trab(T));
+  assert.equal(s.disponible, true); assert.equal(s.datos.terminados, 1);
+  const t = s.datos.activos[0];
+  assert.equal(t.estado, 'En ejecución'); assert.equal(t.avance, 50); assert.equal(t.proximo, 'Firma');
+  assert.deepEqual(t.pasos.map((p) => p.e), ['ok', 'act', '']);
+  assert.equal(t.pago.pagado_xs, 'cuota 1'); assert.equal(t.pago.pendiente_xs, 'cuota 2 vencida el 05-11'); assert.equal(t.pago.folio, '16430');
+});
+test('normalizarTrabajos es fail-closed: rechazo, forma rara o código inválido no muestran nada', () => {
+  assert.deepEqual(normalizarTrabajos({ ok: false, codigo: 'MC_SIN_ACCESO' }), { disponible: false });
+  assert.deepEqual(normalizarTrabajos(null), { disponible: false });
+  assert.deepEqual(normalizarTrabajos({ ok: true, seccion: { disponible: true } }), { disponible: false });
+  assert.equal(normalizarTrabajos(trab({ ...T, codigo: '<b>x</b>' })).datos.activos.length, 0);
+  const t = normalizarTrabajos(trab({ ...T, etapa: 'RARA', avance: 'x', pasos: 'no', documentos: [null, { t: '' }] })).datos.activos[0];
+  assert.equal(t.estado, 'En curso'); assert.equal(t.avance, null); assert.deepEqual(t.pasos, []); assert.deepEqual(t.documentos, []);
+});
+test('pago del trabajo: sin permiso del vínculo o montos ilegibles → null (no se muestra, nunca $0)', () => {
+  assert.equal(pagoTrabajo({ sin_permiso: true }), null);
+  assert.equal(pagoTrabajo({ total: 'x', pagado: 0, pendiente: 0 }), null);
+  assert.equal(pagoTrabajo(undefined), null);
+  const p = pagoTrabajo({ ...T.pago, factura: { sin_permiso: true } });
+  assert.equal(p.folio, null); assert.equal(p.total, 540000);
+  const q = pagoTrabajo({ total: 200000, cuotas_total: 2, pagado: 0, pendiente: 200000, cuotas: [{ n: 1, monto: 100000, vence: '2026-11-20', estado: 'por_pagar' }, { n: 2, monto: 100000, vence: null, estado: 'al_terminar' }] });
+  assert.equal(q.pagado_xs, 'Aún sin pagos registrados'); assert.equal(q.pendiente_xs, 'cuota 1 · vence el 20-11');
+});
+test('conTrabajos respeta la sección: si el resumen dice sin permiso o bloqueada no la reemplaza; error → aviso', () => {
+  const r = resumen({ trabajos: { sin_permiso: true } });
+  assert.deepEqual(conTrabajos(r, trab(T)).secciones.trabajos, { sin_permiso: true });
+  const r2 = resumen({ trabajos: { disponible: false } });
+  assert.equal(datosDe(conTrabajos(r2, trab(T)), 'trabajos').activos[0].codigo, 'TE-2026-901');
+  assert.deepEqual(conTrabajos(r2, 'error').secciones.trabajos, { disponible: false, error: true });
+  assert.equal(r2.secciones.trabajos.disponible, false);   // no muta el original
+});
+test('demo.trabajos imita al servidor: el usuario adicional recibe pago {sin_permiso:true}', async () => {
+  const api = crearApiDemo(demo, { rol: 'consulta' });
+  const j = await api.trabajos(demo.refs.rio);
+  assert.deepEqual(j.seccion.datos.activos[0].pago, { sin_permiso: true });
+  await assert.rejects(api.trabajos('00000000-0000-4000-8000-000000000000'), (e) => e.codigo === 'MC_SIN_ACCESO');
+});
+test('api real: trabajos valida ref y código antes de llamar', async () => {
+  const api = crearApiReal({ SUPABASE_URL: 'https://abcdefgh.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_x', ESQUEMA: 'mc', RPC: { TRABAJOS: 'trabajos' } });
+  await assert.rejects(api.trabajos('no-es-uuid'), (e) => e.codigo === 'MC_SIN_ACCESO');
+  await assert.rejects(api.trabajos('0b9d1c52-5d0e-4a8e-9b51-1f7a3c2e9a01', "TE' OR 1=1"), (e) => e.codigo === 'MC_DATOS');
+  const sinRpc = crearApiReal({ SUPABASE_URL: 'https://abcdefgh.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_x', ESQUEMA: 'mc', RPC: { TRABAJOS: null } });
+  assert.equal(await sinRpc.trabajos('0b9d1c52-5d0e-4a8e-9b51-1f7a3c2e9a01'), null);
 });

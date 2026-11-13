@@ -7,12 +7,14 @@ export const CONFIG = Object.freeze({
   ESQUEMA: 'mc',               // las RPC del cliente viven en el esquema mc (Content-Profile: mc)
   TERMINOS_VERSION: '2026-11-09',  // texto BORRADOR: reemplazar por el aprobado (Ley 21.719) antes del piloto
 
-  // Contrato de datos: qué RPC del cliente existen. MC-1 solo tiene estas tres.
+  // Contrato de datos: qué RPC del cliente existen. MC-1 tiene las tres primeras; MC-5 agrega TRABAJOS.
+  // TRABAJOS = null mientras MC-5 no esté instalado en Supabase (la sección Trabajos muestra "aún no publicado").
   // "Ya transferí" / "Ya lo pagué" quedan deshabilitados («Próximamente») mientras RPC_SOLICITUD_PAGO sea null.
   RPC: Object.freeze({
     SESION: 'mi_sesion',
     RESUMEN: 'empresa_resumen',
     TERMINOS: 'aceptar_terminos',
+    TRABAJOS: 'trabajos',      // MC-5: mc.trabajos(p_ref, p_codigo?) — trabajos especiales (pasos, cuotas, documentos)
     SOLICITUD_PAGO: null,      // MC-3: p. ej. 'solicitud_pago_crear' cuando exista con su GO
   }),
 
