@@ -2,8 +2,8 @@
 // NUNCA la service_role ni una clave sb_secret_: herramientas/verificar.mjs lo revisa antes de publicar.
 // Si cambias SUPABASE_URL, actualiza también connect-src de la CSP en index.html, activar/index.html y 404.html.
 export const CONFIG = Object.freeze({
-  SUPABASE_URL: '',            // ej. 'https://xxxxxxxxxxxx.supabase.co' (vacío = sin backend: solo modo demo)
-  SUPABASE_ANON_KEY: '',       // clave PÚBLICA (anon o sb_publishable_…)
+  SUPABASE_URL: 'https://ulxoxqbuxiuylaolaqxj.supabase.co',   // proyecto Gestoor (las RPC del cliente viven en el esquema mc)
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseG94cWJ1eGl1eWxhb2xhcXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNDMwNDcsImV4cCI6MjA5OTcxOTA0N30.bN_KeSJFEBKSBzwTixRQs92y6aEhBo-SJs4fGxZgAbA',   // clave PÚBLICA anon (la misma del front de Gestoor; rol anon, sin acceso a mc)
   ESQUEMA: 'mc',               // las RPC del cliente viven en el esquema mc (Content-Profile: mc)
   TERMINOS_VERSION: '2026-11-09',  // texto BORRADOR: reemplazar por el aprobado (Ley 21.719) antes del piloto
 
@@ -14,7 +14,7 @@ export const CONFIG = Object.freeze({
     SESION: 'mi_sesion',
     RESUMEN: 'empresa_resumen',
     TERMINOS: 'aceptar_terminos',
-    TRABAJOS: 'trabajos',      // MC-5: mc.trabajos(p_ref, p_codigo?) — trabajos especiales (pasos, cuotas, documentos)
+    TRABAJOS: null,            // MC-5 aún NO instalado en Supabase → «aún no publicado». Al instalar MC-5: 'trabajos'
     SOLICITUD_PAGO: null,      // MC-3: p. ej. 'solicitud_pago_crear' cuando exista con su GO
   }),
 
