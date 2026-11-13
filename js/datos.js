@@ -5,7 +5,13 @@
 //       cada sección: {disponible:false} | {sin_permiso:true} | {bloqueada:true, mejora:'comercial'}
 //       (MC-2…MC-5 agregarán los datos; aquí se esperan como {disponible:true, datos:{…}}).
 //   rechazo: { ok:false, codigo:'MC_SESION_INVALIDA'|'MC_BLOQUEADO'|'MC_SIN_ACCESO'|'MC_DATOS' }
-import { UUID, pesos, parsePeriodo, comparaPeriodo, clp } from './util.js';
+// Contrato MC-5 (gestoor-backend-mc5, 202611101410_mc5b_rpc_trabajos.sql):
+//   mc.trabajos(p_ref, p_codigo?) → { ok, ref, seccion:{ disponible:true, datos:{ activos:[…], terminados:n } } }
+//       cada trabajo: { codigo, servicio, etapa, estado, avance|null, responsable|null, pasos:[{t,e,fecha}], proximo|null,
+//                       pago:{total,cuotas_total,pagado,pendiente,vencido,cuotas:[{n,monto,vence,estado,pagada_el}],factura} | {sin_permiso:true},
+//                       documentos:[{t,fecha,tipo}], documentos_retenidos }
+//   empresa_resumen sigue diciendo trabajos = {disponible:false}: la app reemplaza esa sección con normalizarTrabajos().
+import { UUID, pesos, parsePeriodo, comparaPeriodo, clp, fecha } from './util.js';
 
 export const SECCIONES = ['reporte', 'mi_cuenta', 'facturas', 'trabajos', 'pre_iva', 'pre_renta'];
 
@@ -147,4 +153,71 @@ export function validarContrasena(a, b) {
   if (!/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(a) || !/\d/.test(a)) return 'Combina letras y números.';
   if (a !== b) return 'Las contraseñas no coinciden.';
   return null;
+}
+
+// ── Trabajos especiales (MC-5) ────────────────────────────────────────────────────────────────────────────────
+const ESTADO_TE = { por_iniciar: 'Por iniciar', en_curso: 'En ejecución', en_espera: 'En espera', listo_para_entregar: 'Listo para entregar', terminado: 'Terminado' };
+const ESTADO_CUOTA = new Set(['pagada', 'por_pagar', 'vencida', 'al_terminar']);
+const texto = (x, max) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, max) : null);
+const enumerar = (ns) => (ns.length === 1 ? `cuota ${ns[0]}` : `cuotas ${ns.slice(0, -1).join(', ')} y ${ns[ns.length - 1]}`);
+
+/** Pago de un trabajo para la pantalla. null = no se muestra (sin permiso del vínculo o forma desconocida: fail-closed). */
+export function pagoTrabajo(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p) || p.sin_permiso === true) return null;
+  const total = pesos(p.total); const pagado = pesos(p.pagado); const pendiente = pesos(p.pendiente);
+  if (total === null || pagado === null || pendiente === null) return null;
+  const cuotas = (Array.isArray(p.cuotas) ? p.cuotas : [])
+    .filter((c) => c && Number.isInteger(c.n) && ESTADO_CUOTA.has(c.estado) && pesos(c.monto) !== null)
+    .sort((a, b) => a.n - b.n);
+  const pagadas = cuotas.filter((c) => c.estado === 'pagada').map((c) => c.n);
+  const vencidas = cuotas.filter((c) => c.estado === 'vencida');
+  const sig = cuotas.find((c) => c.estado !== 'pagada');
+  let pendXs = 'Sin cuotas pendientes';
+  if (vencidas.length) pendXs = `${enumerar(vencidas.map((c) => c.n))} vencida${vencidas.length > 1 ? 's' : ''}${vencidas[0].vence ? ' el ' + fecha(vencidas[0].vence) : ''}`;
+  else if (sig) pendXs = `cuota ${sig.n} · ${sig.estado === 'al_terminar' ? 'vence al terminar el trabajo' : 'vence el ' + fecha(sig.vence)}`;
+  const f = p.factura && typeof p.factura === 'object' && !p.factura.sin_permiso ? texto(p.factura.folio, 20) : null;
+  return {
+    total, pagado, pendiente, vencido: pesos(p.vencido) ?? 0,
+    cuotas: Number.isInteger(p.cuotas_total) ? p.cuotas_total : cuotas.length,
+    pagado_xs: pagadas.length ? enumerar(pagadas) : 'Aún sin pagos registrados',
+    pendiente_xs: pendXs,
+    folio: f,
+  };
+}
+
+/** Respuesta de mc.trabajos → sección 'trabajos' que leen las pantallas. Lo que no se entiende, no se muestra. */
+export function normalizarTrabajos(j) {
+  const sec = j && j.ok === true ? j.seccion : null;
+  if (!sec || sec.disponible !== true || !sec.datos || typeof sec.datos !== 'object') return { disponible: false };
+  const activos = (Array.isArray(sec.datos.activos) ? sec.datos.activos : [])
+    .filter((t) => t && typeof t === 'object' && /^TE-\d{4}-\d{3,6}$/.test(String(t.codigo)))
+    .slice(0, 50)
+    .map((t) => {
+      const av = Number.isFinite(t.avance) ? Math.max(0, Math.min(100, Math.round(t.avance))) : null;
+      return {
+        codigo: String(t.codigo),
+        estado: ESTADO_TE[t.etapa] || 'En curso',
+        servicio: texto(t.servicio, 120) || 'Trabajo especial',
+        responsable: texto(t.responsable, 40),
+        avance: av,
+        pasos: (Array.isArray(t.pasos) ? t.pasos : []).filter((x) => x && texto(x.t, 500))
+          .map((x) => ({ t: texto(x.t, 500), e: x.e === 'ok' ? 'ok' : x.e === 'act' ? 'act' : '' })),
+        proximo: texto(t.proximo, 500),
+        pago: pagoTrabajo(t.pago),
+        documentos: (Array.isArray(t.documentos) ? t.documentos : []).filter((d) => d && texto(d.t, 200))
+          .map((d) => ({ t: texto(d.t, 200), fecha: d.fecha ?? null, url: typeof d.url === 'string' ? d.url : null })),
+        documentos_retenidos: t.documentos_retenidos === true,
+      };
+    });
+  const term = Number.isInteger(sec.datos.terminados) && sec.datos.terminados > 0 ? sec.datos.terminados : 0;
+  return { disponible: true, datos: { activos, terminados: term } };
+}
+
+/** Devuelve una COPIA del resumen con la sección trabajos tomada de mc.trabajos (MC-5). Sin permiso o bloqueada: no se toca. */
+export function conTrabajos(resumen, respuesta) {
+  if (!resumen || typeof resumen !== 'object') return resumen;
+  const e = estadoSeccion(resumen.secciones?.trabajos);
+  if (e === 'sin_permiso' || e === 'bloqueada') return resumen;
+  const sec = respuesta === 'error' ? { disponible: false, error: true } : normalizarTrabajos(respuesta);
+  return { ...resumen, secciones: { ...(resumen.secciones || {}), trabajos: sec } };
 }

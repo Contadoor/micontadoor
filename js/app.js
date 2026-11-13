@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos } from './datos.js';
 import { html, urlSegura, CORREO } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
@@ -18,7 +18,7 @@ const esDemo = q.get('demo') === '1';
 
 const st = {
   api: null, sesion: null, empresa: null, resumen: null, perm: null, cargadoAt: 0,
-  mensaje: null, flash: null, tipoEnlace: 'invite', activado: false,
+  mensaje: null, flash: null, tipoEnlace: 'invite', activado: false, enlacePendiente: null,
   abiertos: new Set(), solicitudes: new Set(), hoja: null, rutaPrevia: '',
 };
 
@@ -83,7 +83,7 @@ function pintar() {
   if (RUTAS_ACCESO.has(r) || !st.sesion) {
     const rr = RUTAS_ACCESO.has(r) ? r : 'ingreso';
     cuerpo = rr === 'recuperar' ? vRecuperar({ mensaje: st.mensaje })
-      : rr === 'activar' ? vActivar({ tipo: st.tipoEnlace, mensaje: st.mensaje, listo: st.activado })
+      : rr === 'activar' ? vActivar({ tipo: st.tipoEnlace, mensaje: st.mensaje, listo: st.activado, pendiente: !!st.enlacePendiente })
         : rr === 'terminos' ? vTerminos({ version: CONFIG.TERMINOS_VERSION, mensaje: st.mensaje })
           : vIngreso({ mensaje: st.mensaje, demo: esDemo });
     colorBarra(rr);
@@ -143,7 +143,14 @@ async function cargar(destino) {
 }
 
 async function cargarResumen() {
-  st.resumen = await st.api.resumen(st.empresa.ref);
+  let r = await st.api.resumen(st.empresa.ref);
+  // MC-5: los trabajos especiales vienen de su propia RPC (mc.trabajos). Si falla, la sección muestra un error (nunca datos falsos);
+  // una sesión inválida o un bloqueo sí cortan todo, como en el resto de la app.
+  if (st.api.trabajos && permisos(r).verTrabajos) {
+    try { const t = await st.api.trabajos(st.empresa.ref); if (t) r = conTrabajos(r, t); }
+    catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; r = conTrabajos(r, 'error'); }
+  }
+  st.resumen = r;
   st.perm = permisos(st.resumen);
   st.cargadoAt = Date.now();
   escribir('mc_empresa', st.empresa.ref);
@@ -204,6 +211,7 @@ document.addEventListener('submit', async (ev) => {
         st.mensaje = { ok: true, texto: 'Si el correo corresponde a una cuenta de MiContadoor, te llegará un enlace en unos minutos. Revisa también tu carpeta de spam.' };
         pintar(); return;
       }
+      case 'continuar': { await continuarEnlace(); pintar(); return; }
       case 'activar': {
         const err = validarContrasena(String(d.get('a') || ''), String(d.get('b') || ''));
         if (err) { st.mensaje = { texto: err }; pintar(); return; }
@@ -258,10 +266,16 @@ async function tomarEnlace() {
   const th = q.get('token_hash'); const tipo = q.get('type');
   const frag = new URLSearchParams(location.hash.startsWith('#access_token') || location.hash.startsWith('#error') ? location.hash.slice(1) : '');
   const limpiar = () => history.replaceState(null, '', location.pathname + (esDemo ? '?demo=1' : '') + '#/activar');
-  if (th && tipo) {
-    st.tipoEnlace = tipo === 'recovery' ? 'recovery' : 'invite'; limpiar();
-    try { await st.api.verificarEnlace(th, tipo); st.mensaje = null; } catch { st.mensaje = { texto: mensajeError('ENLACE') }; history.replaceState(null, '', location.pathname + '#/ingreso'); }
-    return true;
+  if (th || tipo) {
+    // H-AUTH-2: con o sin type, el token sale de la barra y del historial de inmediato; si falta algo, error neutro.
+    if (!th || (tipo !== 'invite' && tipo !== 'recovery')) {
+      st.enlacePendiente = null; st.mensaje = { texto: mensajeError('ENLACE') };
+      history.replaceState(null, '', location.pathname + (esDemo ? '?demo=1' : '') + '#/ingreso'); return true;
+    }
+    // H-AUTH-1: NO se canjea al cargar (un escáner de correo que abra el enlace lo gastaría). Queda SOLO en memoria
+    // y se canjea cuando la persona toca "Continuar" (continuarEnlace).
+    st.tipoEnlace = tipo === 'recovery' ? 'recovery' : 'invite'; st.enlacePendiente = { th, tipo }; st.activado = false; st.mensaje = null;
+    limpiar(); return true;
   }
   if (frag.get('access_token') && frag.get('refresh_token')) {
     st.tipoEnlace = frag.get('type') === 'recovery' ? 'recovery' : 'invite';
@@ -270,6 +284,14 @@ async function tomarEnlace() {
   }
   if (frag.get('error') || frag.get('error_description')) { history.replaceState(null, '', location.pathname + '#/ingreso'); st.mensaje = { texto: mensajeError('ENLACE') }; return true; }
   return false;
+}
+
+/** H-AUTH-1: canje del enlace guardado en memoria, SOLO tras el clic en "Continuar". Un intento por clic. */
+async function continuarEnlace() {
+  const p = st.enlacePendiente; st.enlacePendiente = null;
+  if (!p) { st.mensaje = { texto: mensajeError('ENLACE') }; history.replaceState(null, '', location.pathname + '#/ingreso'); return false; }
+  try { await st.api.verificarEnlace(p.th, p.tipo); st.mensaje = null; return true; }
+  catch { st.mensaje = { texto: mensajeError('ENLACE') }; history.replaceState(null, '', location.pathname + '#/ingreso'); return false; }
 }
 
 // ── Arranque ──────────────────────────────────────────────────────────────────────────────────────────────────
