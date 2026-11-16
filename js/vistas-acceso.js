@@ -62,10 +62,27 @@ export function vTerminos({ version, mensaje }) {
     <h1>Antes de empezar</h1>
     <p class="intro">Lee y acepta los términos de uso y el aviso de privacidad de MiContadoor.</p>
     <div class="terminos" tabindex="0">
-      <p><b>BORRADOR · texto legal pendiente de aprobación (versión ${version}).</b></p>
-      <p>MiContadoor es el portal de clientes de Asesorías Contadoor Ltda. Aquí ves la información que tu equipo Contadoor publica sobre tu empresa: reportes, estado de cuenta, proyecciones y trabajos especiales.</p>
-      <p>Las proyecciones (Pre-IVA y Pre-Renta) son estimaciones, no cifras definitivas. Los montos finales son los que te confirmamos en tu reporte.</p>
-      <p>Tus datos se tratan conforme a la Ley 19.628 y la Ley 21.719 de protección de datos personales. Tu acceso es personal: no compartas tu contraseña.</p>
+      <p><b>Términos de uso y aviso de privacidad de MiContadoor</b> · versión ${version}</p>
+      <h2>1. Qué es MiContadoor</h2>
+      <p>MiContadoor es el portal de clientes de Asesorías Contadoor Ltda. (en adelante, «Contadoor»). Aquí ves la información que tu equipo Contadoor publica sobre tu empresa: reportes mensuales, estado de cuenta, proyecciones y trabajos especiales. El portal es solo de consulta: no reemplaza a tu equipo, al SII ni a la Tesorería.</p>
+      <h2>2. Tu acceso es personal</h2>
+      <p>Tu cuenta es solo para ti. No compartas tu contraseña. Si otra persona de tu empresa necesita acceso, pídelo a tu equipo Contadoor y le crearemos su propia cuenta. Si crees que alguien entró con tus datos, cambia tu contraseña y avísanos de inmediato.</p>
+      <h2>3. Las cifras</h2>
+      <p>Los montos de tu reporte son los que tu equipo revisó y confirmó. Las proyecciones (Pre-IVA y Pre-Renta) son estimaciones con la información disponible a la fecha y pueden cambiar; no son cifras definitivas. Ante cualquier diferencia, manda lo que te confirme tu equipo por escrito.</p>
+      <h2>4. Pagos</h2>
+      <p>Los botones «Ya transferí» y «Ya lo pagué» solo nos avisan: el pago se da por recibido cuando nuestro equipo lo confirma. Contadoor nunca te pedirá que transfieras a una cuenta distinta de la que aparece en este portal.</p>
+      <h2>5. Qué información tratamos y para qué</h2>
+      <p>Datos de tu empresa y de sus socios, documentos tributarios y contables, información de pagos y tus datos de contacto, solo lo necesario para prestar el servicio contratado (contabilidad, impuestos, reportes y asesoría). Nunca la vendemos ni la usamos para publicidad de terceros.</p>
+      <h2>6. Quién accede y dónde se guarda</h2>
+      <p>Solo el equipo asignado a tu empresa y la dirección de Contadoor, con usuario personal y registro de cada acceso, bajo deber de reserva. La información se guarda en nuestro sistema de gestión con acceso controlado. Se comparte solo con el SII, la Tesorería u otros organismos cuando el servicio lo requiere, y con proveedores tecnológicos que nos dan soporte bajo confidencialidad, salvo obligación legal.</p>
+      <h2>7. Cuánto tiempo</h2>
+      <p>Mientras dure el servicio y los plazos que exige la ley para la documentación tributaria. Al terminar el servicio, tu acceso a MiContadoor se cierra y te entregamos tu información.</p>
+      <h2>8. Tus derechos</h2>
+      <p>Conforme a la Ley N° 19.628 sobre protección de la vida privada y su actualización por la Ley N° 21.719, puedes pedir en cualquier momento acceder, corregir, eliminar u oponerte al uso de tus datos, o recibir una copia de ellos, escribiendo a info@contadoor.cl.</p>
+      <h2>9. Si algo ocurre</h2>
+      <p>Si detectamos un incidente que pueda afectar tu información, te avisamos sin demora, te contamos qué pasó y qué medidas tomamos.</p>
+      <h2>10. Cambios</h2>
+      <p>Si cambiamos estos términos, te pediremos aceptarlos de nuevo al entrar. Responsable: Asesorías Contadoor Ltda., RUT 77.166.269-2 · info@contadoor.cl.</p>
     </div>
     <form data-form="terminos" novalidate>
       <label class="chk"><input type="checkbox" name="ok" required> Leí y acepto los términos de uso y el aviso de privacidad.</label>

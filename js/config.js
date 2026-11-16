@@ -5,7 +5,7 @@ export const CONFIG = Object.freeze({
   SUPABASE_URL: 'https://ulxoxqbuxiuylaolaqxj.supabase.co',   // proyecto Gestoor (las RPC del cliente viven en el esquema mc)
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseG94cWJ1eGl1eWxhb2xhcXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNDMwNDcsImV4cCI6MjA5OTcxOTA0N30.bN_KeSJFEBKSBzwTixRQs92y6aEhBo-SJs4fGxZgAbA',   // clave PÚBLICA anon (la misma del front de Gestoor; rol anon, sin acceso a mc)
   ESQUEMA: 'mc',               // las RPC del cliente viven en el esquema mc (Content-Profile: mc)
-  TERMINOS_VERSION: '2026-11-09',  // texto BORRADOR: reemplazar por el aprobado (Ley 21.719) antes del piloto
+  TERMINOS_VERSION: '2026-11-16',  // texto V1 (basado en la política de privacidad aprobada 16-11); requiere OK de Luciano + GO-FRONT
 
   // Contrato de datos: qué RPC del cliente existen. MC-1 tiene las tres primeras; MC-5 agrega TRABAJOS.
   // TRABAJOS = null mientras MC-5 no esté instalado en Supabase (la sección Trabajos muestra "aún no publicado").
