@@ -5,7 +5,7 @@ export const CONFIG = Object.freeze({
   SUPABASE_URL: 'https://ulxoxqbuxiuylaolaqxj.supabase.co',   // proyecto Gestoor (las RPC del cliente viven en el esquema mc)
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVseG94cWJ1eGl1eWxhb2xhcXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNDMwNDcsImV4cCI6MjA5OTcxOTA0N30.bN_KeSJFEBKSBzwTixRQs92y6aEhBo-SJs4fGxZgAbA',   // clave PÚBLICA anon (la misma del front de Gestoor; rol anon, sin acceso a mc)
   ESQUEMA: 'mc',               // las RPC del cliente viven en el esquema mc (Content-Profile: mc)
-  TERMINOS_VERSION: '2026-11-16',  // texto V1 (basado en la política de privacidad aprobada 16-11); requiere OK de Luciano + GO-FRONT
+  TERMINOS_VERSION: '2026-11-16',  // texto V1 APROBADO por Luciano 16-11; publicar requiere GO-FRONT
 
   // Contrato de datos: qué RPC del cliente existen. MC-1 tiene las tres primeras; MC-5 agrega TRABAJOS.
   // TRABAJOS = null mientras MC-5 no esté instalado en Supabase (la sección Trabajos muestra "aún no publicado").
@@ -25,7 +25,7 @@ export const CONFIG = Object.freeze({
   WHATSAPP_COMERCIAL: '56946754390',
   WHATSAPP_EQUIPO: '56946754390',
 
-  // Datos para transferir a Contadoor (de la maqueta aprobada; VERIFICAR con Pagos antes de publicar).
+  // Datos para transferir a Contadoor: CONFIRMADOS por Luciano 16-11.
   TRANSFERENCIA: Object.freeze({
     razon_social: 'Asesorías Contadoor Ltda.',
     rut: '77.166.269-2',
