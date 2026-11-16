@@ -270,7 +270,9 @@ a.btn{color:#fff}
 .solo-esc,.tabs .solo-esc{display:none}
 @media (min-width:1024px){
   .app{max-width:none;margin:0;padding:0 0 0 256px;box-shadow:none;min-height:100dvh}
-  .app.sin-tabs{padding-left:0}
+  .app.sin-tabs{padding:0;min-height:100dvh;background:radial-gradient(90% 70% at 50% 0%,#2a1030 0%,#17091A 55%,#0C070E 100%);display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .app.sin-tabs>.demo{align-self:stretch}
+  .app.sin-tabs>.oscura{width:100%;max-width:460px;min-height:0;margin:6vh auto;padding:40px 36px 30px;border-radius:26px;border:1px solid rgba(255,255,255,.08);box-shadow:0 30px 80px rgba(0,0,0,.45)}
   .tabs{left:0;top:0;bottom:0;transform:none;width:256px;max-width:none;display:flex;flex-direction:column;gap:4px;padding:22px 14px;background:#17091A;border:0;overflow:auto}
   .demo-on .tabs{top:28px}
   [data-tema="oscuro"] .tabs{background:#120714}
