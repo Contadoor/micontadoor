@@ -10,7 +10,7 @@ import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
 import { registrarServiceWorker } from './push.js';
 
-const VERSION = '1.0.0-borrador';
+const VERSION = '1.0.0';
 const RUTAS_ACCESO = new Set(['ingreso', 'recuperar', 'activar', 'terminos']);
 const $app = document.getElementById('app');
 const q = new URLSearchParams(location.search);
@@ -90,6 +90,9 @@ function pintar() {
   } else if (!st.empresa) {
     cuerpo = html`<section class="oscura"><h1>Tu acceso aún no tiene empresas</h1><p class="intro">Tu equipo Contadoor debe vincular tu empresa. Escríbenos si crees que es un error.</p><form><button type="button" class="btn lin" data-accion="salir">Salir</button></form></section>`;
     colorBarra('ingreso');
+  } else if (!st.perm) {   // OBS-PWA-1: la ruta cambió mientras la empresa aún se cargaba → estado de carga, nunca una vista sin permisos
+    cuerpo = html`<div class="cargando" role="status" aria-label="Cargando"><div class="spin"></div></div>`;
+    colorBarra('inicio');
   } else {
     cuerpo = vista(r, a); conTabs = true; colorBarra(r);
   }
