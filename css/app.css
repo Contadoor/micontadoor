@@ -265,3 +265,34 @@ a.btn{color:#fff}
 }
 .kpi-btn .hd{flex-wrap:wrap}.kpi-btn .hd b{white-space:nowrap}
 .terminos h2{font-size:14px;margin:14px 0 4px;color:#C77BC9}
+
+/* ── Vista para computador (≥ 1024 px): barra lateral fija + contenido en dos columnas. En el celular nada cambia. ── */
+.solo-esc,.tabs .solo-esc{display:none}
+@media (min-width:1024px){
+  .app{max-width:none;margin:0;padding:0 0 0 256px;box-shadow:none;min-height:100dvh}
+  .app.sin-tabs{padding-left:0}
+  .tabs{left:0;top:0;bottom:0;transform:none;width:256px;max-width:none;display:flex;flex-direction:column;gap:4px;padding:22px 14px;background:#17091A;border:0;overflow:auto}
+  .demo-on .tabs{top:28px}
+  [data-tema="oscuro"] .tabs{background:#120714}
+  .tabs .solo-esc{display:flex}
+  .tabs button{flex-direction:row;justify-content:flex-start;gap:12px;font-size:14px;padding:10px 12px;border-radius:12px;min-height:44px;color:#D9CCD9;text-align:left}
+  .tabs button.on,[data-tema="oscuro"] .tabs button.on{background:linear-gradient(135deg,#803889,#A4599C);color:#fff}
+  .tabs button.on.sub-on,[data-tema="oscuro"] .tabs button.on.sub-on{background:none;color:#D9CCD9}
+  .tabs svg{width:20px;height:20px;flex:none}
+  .nav-marca{align-items:center;gap:10px;padding:0 6px 18px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .nav-marca .wm{font-family:Montserrat,Arial,sans-serif;font-weight:900;font-size:19px}
+  .nav-marca .mi{color:#C77BC9}.nav-marca .co{color:#fff}
+  .tabs [data-ir="mas"]{order:9}
+  .nav-pie{order:10;margin-top:auto;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+  .tabs .salir{width:100%;color:#FFB4AA;border:1px solid rgba(255,180,170,.28)}
+  .hdr{padding:28px 40px 26px}
+  .hdr .hdr-top .logo{display:none}
+  .hdr>*{max-width:1120px;margin-left:auto;margin-right:auto}
+  .hdr .card{max-width:560px;margin-left:0}
+  .sub{max-width:1200px;margin:0 auto;padding-left:40px;padding-right:40px}
+  .sec{max-width:1200px;margin:0 auto;padding:24px 40px 40px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+  .sec>*{grid-column:1/-1}
+  .sec>.card{grid-column:auto;margin-bottom:0}
+  .sec>.card.vacio,.sec>.card.wa-card,.sec>.marca-pie,.sec>p{grid-column:1/-1}
+  .hoja{border-radius:20px;margin-bottom:24px}
+}

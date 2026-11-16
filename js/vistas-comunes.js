@@ -32,8 +32,13 @@ export function tabs(ctx, actual) {
     (p.preIva !== 'sin_permiso' || p.preRenta !== 'sin_permiso') ? ['preiva', 'Proyecciones', I.proyecciones, ['preiva', 'prerenta']] : null,
     ['mas', 'Más', I.mas, ['mas', 'trabajos', 'acceso']],
   ].filter(Boolean);
-  return html`<nav class="tabs" aria-label="Navegación principal" data-n="${items.length}">${items.map(([r, t, ic, g]) =>
-    html`<button type="button" data-ir="${r}" class="${g.includes(actual) ? 'on' : ''}" ${g.includes(actual) ? html`aria-current="page"` : ''}>${ic}${t}</button>`)}</nav>`;
+  // Solo en computador (barra lateral): accesos directos que en el celular viven dentro de «Más».
+  const esc = [['trabajos', 'Trabajos especiales', I.llave, ['trabajos']], ['acceso', 'Mi acceso', I.persona, ['acceso']]];
+  const boton = ([r, t, ic, g], extra = r === 'mas' && actual !== 'mas' ? 'sub-on' : '') => html`<button type="button" data-ir="${r}" class="${(g.includes(actual) ? 'on ' : '') + extra}" ${g.includes(actual) ? html`aria-current="page"` : ''}>${ic}${t}</button>`;
+  return html`<nav class="tabs" aria-label="Navegación principal" data-n="${items.length}">
+    <div class="nav-marca solo-esc">${iconoB(34, 'circulo', 'gBh')}<span class="wm"><span class="mi">Mi</span><span class="co">Contadoor</span></span></div>
+    ${items.map((it) => boton(it))}${esc.map((it) => boton(it, 'solo-esc'))}
+    <div class="nav-pie solo-esc"><button type="button" class="salir" data-accion="salir">${I.atras}Cerrar sesión</button></div></nav>`;
 }
 
 export const chipCandado = html`<span class="chip c-gris">${I.candado} Contadoor PRO</span>`;

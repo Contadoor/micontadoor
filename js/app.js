@@ -10,7 +10,7 @@ import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
 import { registrarServiceWorker } from './push.js';
 
-const VERSION = '1.0.0-borrador';
+const VERSION = '1.0.0';
 const RUTAS_ACCESO = new Set(['ingreso', 'recuperar', 'activar', 'terminos']);
 const $app = document.getElementById('app');
 const q = new URLSearchParams(location.search);

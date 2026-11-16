@@ -140,6 +140,7 @@ export function vMas(ctx) {
         html`<button type="button" role="radio" data-apariencia="${v}" aria-checked="${ctx.tema === v}">${t}</button>`)}</div>
       <div class="xs mt8">"Automático" sigue la configuración de tu celular.</div></div>
     ${waCard(ctx.waEquipo)}
+    <button type="button" class="btn lin" data-accion="salir">Cerrar sesión</button>
     <div class="marca-pie"><img class="logo-cla" src="/img/contadoor_lockup_glossy.png" alt="Contadoor" width="170" height="38"><img class="logo-osc" src="/img/contadoor_lockup_white.png" alt="Contadoor" width="170" height="70"></div>
     <p class="xs c">MiContadoor V1 · ${ctx.version}${ctx.api.modo === 'demo' ? ' · DEMO con datos ficticios' : ''}</p></div>`;
 }
