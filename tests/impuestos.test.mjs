@@ -93,3 +93,28 @@ test('Cumplimiento ve su IVA (sin candado); solo un servidor que aún bloquee mu
   const sr = String(vImpuestos(ctx(), normalizarImpuestos(sinRem)));
   assert.ok(sr.includes('Por confirmar') && !sr.includes('$0<'), 'sin remanente: por confirmar');
 });
+
+test('SII-OBS-2: cartas y cumplimiento con lista blanca, fail-closed y escapados', () => {
+  const n = normalizarImpuestos(base());
+  assert.equal(n.obs.cartas.disponible, true); assert.equal(n.obs.cartas.items.length, 1); assert.equal(n.obs.cumplimiento.cumple, true);
+  const raro = base();
+  raro.observaciones.cartas.items.push({ categoria: 'inventada', titulo: 'x' }, { categoria: 'carta', titulo: '' }, { categoria: 'carta', titulo: MALO, remitente: MALO, plazo: MALO, fecha: '2026-11-01', texto: 'NO', para: 'NO' });
+  const r = normalizarImpuestos(raro);
+  assert.equal(r.obs.cartas.items.length, 2, 'categoría desconocida o sin título no se muestra');
+  assert.deepEqual(Object.keys(r.obs.cartas.items[1]).sort(), ['categoria', 'fecha', 'nueva', 'plazo', 'remitente', 'titulo'], 'lista blanca');
+  const h = String(vImpuestos(ctx(), r));
+  assert.ok(!h.includes('<img src=x') && !h.includes('<script>alert'), 'todo dato del servidor va escapado');
+  assert.ok(h.includes('El SII te envió una notificación') && h.includes('Plazo para responder:'), 'muestra la notificación con su plazo');
+  assert.ok(!h.includes('Muy pronto'), 'ya no dice «Muy pronto»');
+  // Sin datos del SII: mensaje neutro; sin cartas: «Sin cartas ni notificaciones ✓»; no cumple: condiciones pendientes y «Requiere atención».
+  const sd = base(); sd.observaciones.cartas = { disponible: false }; delete sd.observaciones.cumplimiento;
+  const hs = String(vImpuestos(ctx(), normalizarImpuestos(sd)));
+  assert.ok(hs.includes('apenas terminemos de leerlas del SII') && !hs.includes('Tu situación ante el SII'));
+  const vac = base(); vac.observaciones.cartas = { disponible: true, total_12_meses: 0, items: [] };
+  assert.ok(String(vImpuestos(ctx(), normalizarImpuestos(vac))).includes('Sin cartas ni notificaciones ✓'));
+  const nc = base(); nc.observaciones.items = []; nc.observaciones.cartas = { disponible: true, items: [] };
+  nc.observaciones.cumplimiento = { disponible: true, cumple: false, estado: 'No cumple', condiciones: [{ titulo: 'Condición pendiente (ejemplo)', cumple: false }, { titulo: 'Otra', cumple: true }] };
+  const hn = String(vImpuestos(ctx(), normalizarImpuestos(nc)));
+  assert.ok(hn.includes('Hay condiciones por regularizar') && hn.includes('Condición pendiente (ejemplo)') && !hn.includes('>Otra<') && hn.includes('Requiere atención'));
+  assert.equal(normalizarImpuestos({ ...base(), observaciones: { items: [], cumplimiento: { disponible: true, cumple: 'si' } } }).obs.cumplimiento.disponible, false, 'cumple no booleano = no se muestra');
+});

@@ -90,8 +90,23 @@ function observaciones(n) {
   if (f22.length) filas.push(html`<div class="li"><span class="ic i-n" aria-hidden="true">!</span><div class="t"><b>Tu declaración de renta${f22[0].anio ? ' (AT ' + f22[0].anio + ')' : ''} tiene observaciones</b>
     ${f22.map((x) => html`<span class="sm bloque">${x.texto || 'Observación del SII'}${x.codigo ? html` <span class="xs">(${x.codigo})</span>` : ''}</span>`)}<span class="chip c-rev">Tu analista ya lo está revisando</span></div></div>`);
   else filas.push(html`<div class="li"><span class="ic i-v" aria-hidden="true">✓</span><div class="t"><b>Tu declaración de renta (F22)</b><span class="sm"><span class="ok-txt">Sin observaciones ✓</span></span></div></div>`);
-  if (!n.obs.cartas) filas.push(html`<div class="li"><span class="ic i-m" aria-hidden="true">${I.documento}</span><div class="t"><b>Cartas y notificaciones del SII</b><span class="sm">Muy pronto las verás aquí.</span></div></div>`);
-  const atencion = nd.length || ob.length || f22.length;
+  // SII-OBS-2: cartas y notificaciones del SII (últimos 12 meses) y situación ante el SII.
+  const ca = n.obs.cartas || { disponible: false, items: [] };
+  const nuevas = ca.disponible ? ca.items.filter((x) => x.nueva) : [];
+  if (!ca.disponible) filas.push(html`<div class="li"><span class="ic i-m" aria-hidden="true">${I.documento}</span><div class="t"><b>Cartas y notificaciones del SII</b><span class="sm">Las verás aquí apenas terminemos de leerlas del SII.</span></div></div>`);
+  else if (!ca.items.length) filas.push(html`<div class="li"><span class="ic i-v" aria-hidden="true">✓</span><div class="t"><b>Cartas y notificaciones del SII</b><span class="sm"><span class="ok-txt">Sin cartas ni notificaciones ✓</span> en los últimos 12 meses.</span></div></div>`);
+  else ca.items.forEach((x) => filas.push(html`<div class="li"><span class="ic ${x.nueva ? 'i-n' : 'i-m'}" aria-hidden="true">${x.nueva ? '!' : I.documento}</span><div class="t">
+    <b>${x.categoria === 'notificacion' ? 'El SII te envió una notificación' : 'El SII te envió una carta'}</b>
+    <span class="sm">${x.titulo}</span>
+    <span class="xs bloque">${[x.fecha ? 'Recibida el ' + fecha(x.fecha, { anio: true }) : '', x.remitente ? 'de ' + x.remitente : ''].filter(Boolean).join(' · ')}</span>
+    ${x.plazo ? html`<span class="sm bloque">Plazo para responder: ${x.plazo}</span>` : ''}
+    ${x.nueva ? html`<span class="chip c-rev">Tu analista ya lo está revisando</span>` : ''}</div></div>`));
+  const cu = n.obs.cumplimiento || { disponible: false };
+  if (cu.disponible) filas.push(html`<div class="li"><span class="ic ${cu.cumple ? 'i-v' : 'i-n'}" aria-hidden="true">${cu.cumple ? '✓' : '!'}</span><div class="t"><b>Tu situación ante el SII</b>
+    <span class="sm">${cu.cumple ? html`<span class="ok-txt">Al día ✓</span>` : 'Hay condiciones por regularizar'}${cu.estado ? ' · ' + cu.estado : ''}</span>
+    ${!cu.cumple ? cu.condiciones.filter((x) => x.cumple === false).map((x) => html`<span class="sm bloque">${x.titulo}</span>`) : ''}
+    ${!cu.cumple ? html`<span class="chip c-rev">Tu analista ya lo está revisando</span>` : ''}</div></div>`);
+  const atencion = nd.length || ob.length || f22.length || nuevas.length || (cu.disponible && !cu.cumple);
   return html`<div class="card obs"><div class="hd"><h3 class="t15">Observaciones del SII</h3><span class="chip ${atencion ? 'c-pend' : 'c-ok'}">${atencion ? 'Requiere atención' : 'Sin observaciones ✓'}</span></div>
     ${filas}<div class="xs mt8">No necesitas hacer nada: si hace falta algún documento, tu analista te escribe.</div></div>`;
 }
