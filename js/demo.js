@@ -47,7 +47,7 @@ const IMPUESTOS_RIO = {
     ppm_base: 9550000, ppm_tasa: 2.5, ppm_tasa_fuente: 'sii', ppm: 238750,
     iva_determinado: 660132, iva_pagar: 660132, remanente_siguiente: 0, total: 898882, exenta: false,
   },
-  oficial: null,
+  oficial: null, preiva_enviado: null,
   f29: [
     { periodo: '202610', estado: 'por_declarar', vence: '2026-11-20', total: null },
     { periodo: '202609', estado: 'declarado', vence: '2026-10-20', total: 640000 },
@@ -264,13 +264,17 @@ export const demo = {
     }
     return { ok: true, ref, seccion: { disponible: true, datos: d } };
   },
-  /** Igual que mc.mis_impuestos (MC-IMP-1). Río: conectada al SII; Aromos (Cumplimiento): bloqueada; Alerce: aún no conectada. */
+  /** Igual que mc.mis_impuestos (MC-IMP-1 + 1b). Río: Pre-IVA estimado; Aromos (Cumplimiento): reporte validado; Alerce: aún no conectada. */
   impuestos(ref, opciones = {}) {
     const e = EMPRESAS.find((x) => x.ref === ref);
     if (!e) return null;
-    const nivel = opciones.plan === 'cumpl' ? 'basico' : e.plan_nivel;
-    if (nivel !== 'pro') return { ok: true, ref, periodo: '202610', bloqueada: true, mejora: 'comercial' };
-    if (ref !== REF.rio) return { ok: true, ref, periodo: '202610', conexion: { estado: 'no_conectado' }, oficial: null, vence: '2026-11-20' };
+    // Luciano 19-11: también el plan Cumplimiento ve su IVA. Aromos (Cumplimiento) muestra el caso con el reporte cerrado.
+    if (ref === REF.aromos) {
+      const r = clon(IMPUESTOS_RIO); r.ref = ref;
+      r.oficial = { fuente: 'reporte', total: 1050000, debito: 1748000, credito: 969000, remanente: 118868, ppm: 238750, confirmado_en: '2026-11-14T15:30:00Z' };
+      return r;
+    }
+    if (ref !== REF.rio) return { ok: true, ref, periodo: '202610', conexion: { estado: 'no_conectado' }, oficial: null, preiva_enviado: null, vence: '2026-11-20' };
     return clon(IMPUESTOS_RIO);
   },
 };

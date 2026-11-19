@@ -228,10 +228,10 @@ export function conTrabajos(resumen, respuesta) {
 //     estimacion:{debito, credito, ventas_neto, ventas_exento, ventas_documentos, compras_documentos, compras_neto, compras_exento, compras_pendientes:{documentos,iva}|null,
 //                 remanente:{monto,cod77,periodo,utm_origen,utm_destino}|null, remanente_motivo, ppm_base, ppm_tasa, ppm_tasa_fuente, ppm,
 //                 iva_determinado, iva_pagar, remanente_siguiente, total, exenta},
-//     oficial:{fuente:'sii_declarado'|'reporte'|'preiva', total, debito, credito, remanente, ppm, confirmado_en}|null,
+//     oficial:{fuente:'reporte', total, debito, credito, remanente, ppm, confirmado_en}|null   (MC-IMP-1b: solo el reporte),
+//     preiva_enviado:{total, debito, credito, remanente, ppm, enviado_en}|null   (sin reporte: Pre-IVA enviado por el analista),
 //     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}], cartas:{disponible} } }
 const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'no_declarado', 'por_declarar', 'sin_dato']);
-const FUENTES_OF = new Set(['sii_declarado', 'reporte', 'preiva']);
 const TIPOS_OBS = new Set(['f29_observado', 'f29_en_revision', 'f29_no_declarado', 'f22_observacion']);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const AAAAMM = /^(20\d{2})(0[1-9]|1[0-2])$/;
@@ -246,10 +246,17 @@ export function normalizarImpuestos(j) {
   const periodo = periodoGuion(j.periodo);
   if (!periodo) return { estado: 'error' };
   if (j.bloqueada === true) return { estado: 'bloqueada', periodo };
-  const of = j.oficial && typeof j.oficial === 'object' && FUENTES_OF.has(j.oficial.fuente) && pesos(j.oficial.total) !== null
-    ? { fuente: j.oficial.fuente, total: pesos(j.oficial.total), confirmado_en: fechaOk(j.oficial.confirmado_en) } : null;
+  // MANDA EL REPORTE (Luciano 19-11): solo el reporte cerrado/enviado es oficial («Validado por Contadoor»).
+  // Sin reporte: el Pre-IVA enviado por el analista (si existe) sigue siendo una estimación. El F29 declarado en el SII
+  // nunca es el monto principal (MC-IMP-1 lo mandaba como 'sii_declarado': se ignora por si el portal llega antes que MC-IMP-1b).
+  const of = j.oficial && typeof j.oficial === 'object' && j.oficial.fuente === 'reporte' && pesos(j.oficial.total) !== null
+    ? { fuente: 'reporte', total: pesos(j.oficial.total), debito: pesos(j.oficial.debito), credito: pesos(j.oficial.credito),
+        remanente: pesos(j.oficial.remanente), ppm: pesos(j.oficial.ppm), confirmado_en: fechaOk(j.oficial.confirmado_en) } : null;
+  const pj = j.preiva_enviado && typeof j.preiva_enviado === 'object' ? j.preiva_enviado
+    : (j.oficial?.fuente === 'preiva' ? { total: j.oficial.total, enviado_en: j.oficial.confirmado_en } : null);
+  const preiva = !of && pj && pesos(pj.total) !== null ? { total: pesos(pj.total), enviado_en: fechaOk(pj.enviado_en) } : null;
   const vence = fechaOk(j.vence);
-  if (j.conexion?.estado !== 'conectado') return { estado: 'no_conectado', periodo, vence, oficial: of };
+  if (j.conexion?.estado !== 'conectado') return { estado: 'no_conectado', periodo, vence, oficial: of, preiva };
   const e = j.estimacion && typeof j.estimacion === 'object' ? j.estimacion : {};
   const cp = e.compras_pendientes && typeof e.compras_pendientes === 'object' ? e.compras_pendientes : null;
   const rem = e.remanente && typeof e.remanente === 'object' && pesos(e.remanente.monto) !== null
@@ -272,12 +279,14 @@ export function normalizarImpuestos(j) {
                    codigo: texto(x.codigo, 20), texto: texto(x.texto, 200) }));
   return {
     estado: 'ok', periodo, vence, datos_al: fechaOk(j.datos_al), cobertura_completa: j.cobertura_completa === true,
-    est, oficial: of, f29, obs: { items, cartas: j.observaciones?.cartas?.disponible === true },
+    est, oficial: of, preiva, f29, obs: { items, cartas: j.observaciones?.cartas?.disponible === true },
   };
 }
 
-/** Lo que se muestra como «a pagar»: el oficial si existe; si no, la estimación (puede ser null = «Por confirmar»). */
-export function totalMostrado(n) { return n?.oficial ? n.oficial.total : (n?.est?.total ?? null); }
+/** Monto principal: el del reporte validado; si no, el Pre-IVA enviado por el analista; si no, el cálculo con datos del SII (null = «Por confirmar»). */
+export function totalMostrado(n) { return n?.oficial ? n.oficial.total : n?.preiva ? n.preiva.total : (n?.est?.total ?? null); }
+/** true = el reporte del período está cerrado/enviado («IVA del mes · Validado por Contadoor»); false = «Pre-IVA del mes · Estimado con datos del SII». */
+export function validado(n) { return !!n?.oficial; }
 
 // Umbrales del motor de recomendaciones del Pre-IVA (Contadoor.app pre-iva/recomendaciones.js, CONFIG de piloto):
 // minImpacto $50.000 · IVA sobre el promedio +15 % con ≥ 4 meses · aviso de pago con ≤ 5 días al vencimiento · máximo 4 (aquí 3).
@@ -293,7 +302,7 @@ export function recomendacionesImpuestos(n, hoy) {
   if (!n || n.estado !== 'ok') return [];
   const out = [];
   const total = totalMostrado(n);
-  const declarado = n.oficial?.fuente === 'sii_declarado' || n.f29.find((x) => x.periodo === n.periodo)?.estado === 'declarado';
+  const declarado = n.f29.find((x) => x.periodo === n.periodo)?.estado === 'declarado';
   const plazo = n.vence ? fecha(n.vence) : null;
   // 1. Reserva: el total del mes está sobre el promedio de los F29 declarados de meses anteriores.
   const prev = n.f29.filter((x) => x.periodo !== n.periodo && x.estado === 'declarado' && x.total !== null && x.total > 0).map((x) => x.total);

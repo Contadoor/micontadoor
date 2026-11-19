@@ -39,12 +39,16 @@ export function vInicio(ctx) {
   const nov = (rep?.novedades || []).slice(0, 4);
   const piv = datosDe(ctx.resumen, 'pre_iva'); const pre = datosDe(ctx.resumen, 'pre_renta');
   let proy = '';
-  if (ctx.perm.preIva === 'bloqueada' || ctx.perm.preRenta === 'bloqueada') {
+  const ivaOk = ctx.impuestos?.estado === 'ok';
+  if (ivaOk) {   // Luciano 19-11: todos los planes ven su IVA del mes; en Cumplimiento, Pre-Renta sigue con candado
+    proy = html`<div class="kpis mb">${kpiImpuestos(ctx.impuestos)}${pre ? html`<button type="button" class="card kpi-btn" data-ir="prerenta"><div class="hd"><b>Pre-Renta</b><span class="chip c-proy">Proyección</span></div><div class="mid s21">${clp(pre.impuesto, { aprox: true })}</div><div class="xs">Renta AT ${pre.anio_tributario}</div></button>` : ''}</div>
+      ${ctx.perm.preRenta === 'bloqueada' ? teaser('Pre-Renta', [['Renta proyectada', '$•.•••.•••'], ['PPM pagados', '$•••.•••']], ['Proyección de tu renta anual para llegar a abril preparado'], ctx.waMejora) : ''}`;
+  } else if (ctx.perm.preIva === 'bloqueada' || ctx.perm.preRenta === 'bloqueada') {
     proy = teaser('Pre-IVA y Pre-Renta', [['IVA estimado del mes', '$•••.•••'], ['Renta proyectada', '$•.•••.•••']],
       ['Sabe antes cuánto viene de IVA cada mes', 'Proyección de tu renta anual para llegar a abril preparado'], ctx.waMejora);
-  } else if (piv || pre || ctx.impuestos?.estado === 'ok') {
+  } else if (piv || pre) {
     proy = html`<div class="kpis mb">
-      ${ctx.impuestos?.estado === 'ok' ? kpiImpuestos(ctx.impuestos) : piv ? html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>Pre-IVA</b>${chipEstadoProy(piv.estado)}</div><div class="mid s21">${clp(piv.estimado, { aprox: true })}</div><div class="xs">IVA de ${mesDe(piv.periodo)} a hoy</div></button>` : html`<span></span>`}
+      ${piv ? html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>Pre-IVA</b>${chipEstadoProy(piv.estado)}</div><div class="mid s21">${clp(piv.estimado, { aprox: true })}</div><div class="xs">IVA de ${mesDe(piv.periodo)} a hoy</div></button>` : html`<span></span>`}
       ${pre ? html`<button type="button" class="card kpi-btn" data-ir="prerenta"><div class="hd"><b>Pre-Renta</b><span class="chip c-proy">Proyección</span></div><div class="mid s21">${clp(pre.impuesto, { aprox: true })}</div><div class="xs">Renta AT ${pre.anio_tributario}</div></button>` : ''}
     </div>`;
   }

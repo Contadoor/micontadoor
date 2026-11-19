@@ -154,11 +154,11 @@ async function cargarResumen() {
     try { const t = await st.api.trabajos(st.empresa.ref); if (t) r = conTrabajos(r, t); }
     catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; r = conTrabajos(r, 'error'); }
   }
-  // MC-IMP-1: «Tu IVA del mes» (mc.mis_impuestos). Solo si el vínculo ve Pre-IVA; si la RPC falla, la pantalla muestra un aviso
+  // MC-IMP-1: «Tu IVA del mes» (mc.mis_impuestos). Todo vínculo con la sección Pre-IVA (también Cumplimiento); si la RPC falla, la pantalla muestra un aviso
   // (nunca cifras inventadas). null = RPC no configurada → se mantiene el Pre-IVA de siempre.
   const pm = permisos(r);
   let imp = null;
-  if (st.api.impuestos && (pm.preIva === 'ok' || pm.preIva === 'vacia')) {
+  if (st.api.impuestos && pm.preIva !== 'sin_permiso') {   // Luciano 19-11: el plan Cumplimiento también ve su IVA del mes
     try { const j = await st.api.impuestos(st.empresa.ref); imp = j ? normalizarImpuestos(j) : null; }
     catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; imp = { estado: 'error' }; }
   }

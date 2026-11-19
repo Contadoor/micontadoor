@@ -34,7 +34,7 @@ const CEL = [
   ['07_mi_cuenta_pagado', '&empresa=1', 'cuenta/pagado', true], ['08_comprobante', '&empresa=1', 'pago/cp-f29-10'],
   ['09_tu_iva_del_mes', '&empresa=1', 'preiva', true], ['10_prerenta', '&empresa=1', 'prerenta'], ['11_trabajos', '&empresa=1', 'trabajos'],
   ['12_mas_mi_plan_apariencia', '&empresa=1', 'mas'], ['13_mi_acceso', '&empresa=1', 'acceso'],
-  ['14_cumplimiento_inicio', '&empresa=2', 'inicio'], ['15_cumplimiento_preiva_bloqueado', '&empresa=2', 'preiva'],
+  ['14_cumplimiento_inicio', '&empresa=2', 'inicio'], ['15_cumplimiento_iva_validado', '&empresa=2', 'preiva', true],
   ['16_cumplimiento_prerenta_bloqueada', '&empresa=2', 'prerenta'], ['17_cumplimiento_mi_plan', '&empresa=2', 'mas'],
   ['18_usuario_adicional_inicio', '&empresa=3', 'inicio'], ['19_usuario_adicional_mi_cuenta', '&empresa=3', 'cuenta'],
   ['20_mi_cuenta_por_pagar_cumplimiento', '&empresa=2', 'cuenta'],
