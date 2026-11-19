@@ -56,7 +56,11 @@ const IMPUESTOS_RIO = {
     { periodo: '202606', estado: 'declarado', vence: '2026-07-20', total: 655000 },
     { periodo: '202605', estado: 'declarado', vence: '2026-06-22', total: 690000 },
   ],
-  observaciones: { items: [{ tipo: 'f22_observacion', anio_tributario: 2026, codigo: 'F135', texto: 'Diferencia en los retiros informados por la empresa (ejemplo).' }], cartas: { disponible: false } },
+  observaciones: {
+    items: [{ tipo: 'f22_observacion', anio_tributario: 2026, codigo: 'F135', texto: 'Diferencia en los retiros informados por la empresa (ejemplo).' }],
+    cartas: { disponible: true, total_12_meses: 1, items: [{ categoria: 'notificacion', titulo: 'Solicitud de antecedentes de 2 facturas de un proveedor (ejemplo)', fecha: '2026-11-12', remitente: 'Unidad de ejemplo del SII', plazo: 'Dentro de los 5 días hábiles', nueva: true }] },
+    cumplimiento: { disponible: true, cumple: true, estado: 'Cumple sus obligaciones tributarias', actualizado_en: '2026-11-18T10:00:00Z', condiciones: [{ titulo: 'Sin deudas tributarias (ejemplo)', cumple: true }] },
+  },
 };
 
 const DATOS = {
