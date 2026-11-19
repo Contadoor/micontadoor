@@ -221,3 +221,118 @@ export function conTrabajos(resumen, respuesta) {
   const sec = respuesta === 'error' ? { disponible: false, error: true } : normalizarTrabajos(respuesta);
   return { ...resumen, secciones: { ...(resumen.secciones || {}), trabajos: sec } };
 }
+
+// ── Tu IVA del mes (MC-IMP-1) ─────────────────────────────────────────────────────────────────────────────────
+// Contrato (gestoor-backend, 202611191200_mc_mis_impuestos.sql): mc.mis_impuestos(p_ref, p_periodo?) →
+//   { ok, ref, periodo:'AAAAMM', bloqueada? , conexion:{estado:'conectado'|'no_conectado'}, datos_al, cobertura_completa, vence,
+//     estimacion:{debito, credito, ventas_neto, ventas_exento, ventas_documentos, compras_documentos, compras_neto, compras_exento, compras_pendientes:{documentos,iva}|null,
+//                 remanente:{monto,cod77,periodo,utm_origen,utm_destino}|null, remanente_motivo, ppm_base, ppm_tasa, ppm_tasa_fuente, ppm,
+//                 iva_determinado, iva_pagar, remanente_siguiente, total, exenta},
+//     oficial:{fuente:'reporte', total, debito, credito, remanente, ppm, confirmado_en}|null   (MC-IMP-1b: solo el reporte),
+//     preiva_enviado:{total, debito, credito, remanente, ppm, enviado_en}|null   (sin reporte: Pre-IVA enviado por el analista),
+//     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}], cartas:{disponible} } }
+const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'no_declarado', 'por_declarar', 'sin_dato']);
+const TIPOS_OBS = new Set(['f29_observado', 'f29_en_revision', 'f29_no_declarado', 'f22_observacion']);
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const AAAAMM = /^(20\d{2})(0[1-9]|1[0-2])$/;
+/** 'AAAAMM' → 'AAAA-MM' (el formato que usa el resto del portal) o null. */
+export function periodoGuion(p) { const m = AAAAMM.exec(String(p ?? '')); return m ? `${m[1]}-${m[2]}` : null; }
+const fechaOk = (v) => (typeof v === 'string' && (FECHA.test(v) || !Number.isNaN(Date.parse(v))) ? v : null);
+const num = (v) => { if (v === null || v === undefined || v === '') return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
+
+/** Respuesta de mc.mis_impuestos → forma de pantalla. Fail-closed: lo que no se entiende queda en null y no se muestra. */
+export function normalizarImpuestos(j) {
+  if (!j || j.ok !== true) return { estado: 'error' };
+  const periodo = periodoGuion(j.periodo);
+  if (!periodo) return { estado: 'error' };
+  if (j.bloqueada === true) return { estado: 'bloqueada', periodo };
+  // MANDA EL REPORTE (Luciano 19-11): solo el reporte cerrado/enviado es oficial («Validado por Contadoor»).
+  // Sin reporte: el Pre-IVA enviado por el analista (si existe) sigue siendo una estimación. El F29 declarado en el SII
+  // nunca es el monto principal (MC-IMP-1 lo mandaba como 'sii_declarado': se ignora por si el portal llega antes que MC-IMP-1b).
+  const of = j.oficial && typeof j.oficial === 'object' && j.oficial.fuente === 'reporte' && pesos(j.oficial.total) !== null
+    ? { fuente: 'reporte', total: pesos(j.oficial.total), debito: pesos(j.oficial.debito), credito: pesos(j.oficial.credito),
+        remanente: pesos(j.oficial.remanente), ppm: pesos(j.oficial.ppm), confirmado_en: fechaOk(j.oficial.confirmado_en) } : null;
+  const pj = j.preiva_enviado && typeof j.preiva_enviado === 'object' ? j.preiva_enviado
+    : (j.oficial?.fuente === 'preiva' ? { total: j.oficial.total, enviado_en: j.oficial.confirmado_en } : null);
+  const preiva = !of && pj && pesos(pj.total) !== null ? { total: pesos(pj.total), enviado_en: fechaOk(pj.enviado_en) } : null;
+  const vence = fechaOk(j.vence);
+  if (j.conexion?.estado !== 'conectado') return { estado: 'no_conectado', periodo, vence, oficial: of, preiva };
+  const e = j.estimacion && typeof j.estimacion === 'object' ? j.estimacion : {};
+  const cp = e.compras_pendientes && typeof e.compras_pendientes === 'object' ? e.compras_pendientes : null;
+  const rem = e.remanente && typeof e.remanente === 'object' && pesos(e.remanente.monto) !== null
+    ? { monto: pesos(e.remanente.monto), cod77: pesos(e.remanente.cod77), periodo: periodoGuion(e.remanente.periodo) } : null;
+  const est = {
+    debito: pesos(e.debito), credito: pesos(e.credito), ventas_neto: pesos(e.ventas_neto), ventas_exento: pesos(e.ventas_exento),
+    ventas_documentos: Number.isInteger(e.ventas_documentos) ? e.ventas_documentos : null,
+    compras_documentos: Number.isInteger(e.compras_documentos) ? e.compras_documentos : null,
+    compras_neto: pesos(e.compras_neto), compras_exento: pesos(e.compras_exento),
+    compras_pendientes: cp && Number.isInteger(cp.documentos) && cp.documentos > 0 ? { documentos: cp.documentos, iva: pesos(cp.iva) } : null,
+    remanente: rem, remanente_motivo: typeof e.remanente_motivo === 'string' ? e.remanente_motivo.slice(0, 40) : null,
+    ppm_base: pesos(e.ppm_base), ppm_tasa: num(e.ppm_tasa), ppm: pesos(e.ppm),
+    iva_determinado: pesos(e.iva_determinado), iva_pagar: pesos(e.iva_pagar), remanente_siguiente: pesos(e.remanente_siguiente),
+    total: pesos(e.total), exenta: e.exenta === true,
+  };
+  const f29 = (Array.isArray(j.f29) ? j.f29 : []).filter((x) => x && AAAAMM.test(String(x.periodo)) && ESTADOS_F29.has(x.estado)).slice(0, 12)
+    .map((x) => ({ periodo: periodoGuion(x.periodo), estado: x.estado, vence: fechaOk(x.vence), total: pesos(x.total) }));
+  const items = (Array.isArray(j.observaciones?.items) ? j.observaciones.items : []).filter((x) => x && TIPOS_OBS.has(x.tipo)).slice(0, 12)
+    .map((x) => ({ tipo: x.tipo, periodo: periodoGuion(x.periodo), anio: Number.isInteger(x.anio_tributario) ? x.anio_tributario : null,
+                   codigo: texto(x.codigo, 20), texto: texto(x.texto, 200) }));
+  return {
+    estado: 'ok', periodo, vence, datos_al: fechaOk(j.datos_al), cobertura_completa: j.cobertura_completa === true,
+    est, oficial: of, preiva, f29, obs: { items, cartas: j.observaciones?.cartas?.disponible === true },
+  };
+}
+
+/** Monto principal: el del reporte validado; si no, el Pre-IVA enviado por el analista; si no, el cálculo con datos del SII (null = «Por confirmar»). */
+export function totalMostrado(n) { return n?.oficial ? n.oficial.total : n?.preiva ? n.preiva.total : (n?.est?.total ?? null); }
+/** true = el reporte del período está cerrado/enviado («IVA del mes · Validado por Contadoor»); false = «Pre-IVA del mes · Estimado con datos del SII». */
+export function validado(n) { return !!n?.oficial; }
+
+// Umbrales del motor de recomendaciones del Pre-IVA (Contadoor.app pre-iva/recomendaciones.js, CONFIG de piloto):
+// minImpacto $50.000 · IVA sobre el promedio +15 % con ≥ 4 meses · aviso de pago con ≤ 5 días al vencimiento · máximo 4 (aquí 3).
+export const RECO = Object.freeze({ minImpacto: 50000, sobrePromedioPct: 0.15, minMesesPromedio: 4, vencCercanoDias: 5, max: 3 });
+const dias = (a, b) => { const x = Date.parse(a + 'T00:00:00Z'); const y = Date.parse(b + 'T00:00:00Z'); return Number.isFinite(x) && Number.isFinite(y) ? Math.round((x - y) / 864e5) : null; };
+
+/**
+ * Recomendaciones para el cliente con SUS datos del SII. Si falta un dato, la regla no se dispara (nunca relleno).
+ * Cada una: pregunta, lo detectado (con cifra), lo que significa (en pesos), qué hacer (con plazo) y quién lo hace.
+ * hoy = 'AAAA-MM-DD' (fecha de Chile).
+ */
+export function recomendacionesImpuestos(n, hoy) {
+  if (!n || n.estado !== 'ok') return [];
+  const out = [];
+  const total = totalMostrado(n);
+  const declarado = n.f29.find((x) => x.periodo === n.periodo)?.estado === 'declarado';
+  const plazo = n.vence ? fecha(n.vence) : null;
+  // 1. Reserva: el total del mes está sobre el promedio de los F29 declarados de meses anteriores.
+  const prev = n.f29.filter((x) => x.periodo !== n.periodo && x.estado === 'declarado' && x.total !== null && x.total > 0).map((x) => x.total);
+  let reserva = false;
+  if (!declarado && total !== null && prev.length >= RECO.minMesesPromedio) {
+    const prom = Math.round(prev.reduce((s, x) => s + x, 0) / prev.length);
+    const dif = total - prom;
+    if (total >= prom * (1 + RECO.sobrePromedioPct) && dif >= RECO.minImpacto) {
+      reserva = true;
+      out.push({ id: 'reserva', color: 'ambar', impacto: dif, q: '¿Cuánto debo reservar este mes?',
+        detectado: `Tu F29 de este mes (${clp(total)}) está ${Math.round((dif / prom) * 100)} % sobre tu promedio de ${prev.length} meses (${clp(prom)}).`,
+        significa: `${clp(dif)} más que en un mes normal.`,
+        accion: `Reserva ${clp(total)}${plazo ? ' antes del ' + plazo : ''} para pagar sin atrasos.`, quien: 'tu', plazo });
+    }
+  }
+  // 2. Facturas de compra pendientes de aceptar en el SII (no suman crédito mientras estén pendientes).
+  const cp = n.est.compras_pendientes;
+  if (cp && cp.iva !== null && cp.iva >= RECO.minImpacto) {
+    out.push({ id: 'pendientes', color: 'verde', impacto: cp.iva, q: '¿Qué facturas de compra debo revisar?',
+      detectado: `Tienes ${cp.documentos} factura${cp.documentos > 1 ? 's' : ''} de proveedores pendiente${cp.documentos > 1 ? 's' : ''} en el SII, con ${clp(cp.iva)} de IVA.`,
+      significa: `${clp(cp.iva)} de IVA que hoy no está bajando tu impuesto.`,
+      accion: 'Revisa que correspondan a compras de tu empresa; si alguna no corresponde, avísanos para reclamarla a tiempo.', quien: 'tu', plazo: null });
+  }
+  // 3. Pago cercano (solo si no se disparó la reserva, para no repetir).
+  const d = n.vence && hoy ? dias(n.vence, hoy) : null;
+  if (!reserva && !declarado && total !== null && total > 0 && d !== null && d >= 0 && d <= RECO.vencCercanoDias) {
+    out.push({ id: 'vencimiento', color: 'morado', impacto: total, q: '¿Cuándo debo pagar?',
+      detectado: `Tu F29 vence el ${plazo} (${d === 0 ? 'hoy' : d === 1 ? 'mañana' : 'en ' + d + ' días'}).`,
+      significa: `${clp(total)} a pagar ese día.`,
+      accion: `Ten disponibles ${clp(total)} antes del ${plazo}.`, quien: 'tu', plazo });
+  }
+  return out.sort((a, b) => b.impacto - a.impacto).slice(0, RECO.max);
+}

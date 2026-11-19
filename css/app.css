@@ -298,3 +298,30 @@ a.btn{color:#fff}
   .sec>.card.vacio,.sec>.card.wa-card,.sec>.marca-pie,.sec>p{grid-column:1/-1}
   .hoja{border-radius:20px;margin-bottom:24px}
 }
+
+/* «Tu IVA del mes» (MC-IMP-1) · piezas de la maqueta aprobada el 19-11-2026 */
+.act{display:inline-flex;align-items:center;gap:7px;margin-top:10px;background:rgba(95,207,156,.15);color:#5FCF9C;border-radius:999px;padding:6px 11px;font-weight:700;font-size:12px}
+.act i{width:7px;height:7px;border-radius:50%;background:#5FCF9C}
+.iv-paso{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--borde);font-size:13.5px}
+.iv-paso:first-of-type{border-top:0}
+.iv-paso .t{min-width:0}.iv-paso .t b{display:block;font-weight:600}.iv-paso .v{white-space:nowrap;font-weight:700}
+.iv-paso.res{border-top:1.5px solid var(--tinta)}.iv-paso.res .t b,.iv-paso.res .v{font-family:Montserrat,sans-serif;font-weight:800}
+.iv-paso.menos .v{color:var(--verde)}
+.card.kpi{margin-bottom:0}.card.kpi .xs{display:block;margin-top:2px}
+.estf29{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.estf29 div{background:var(--fondo);border-radius:12px;padding:9px 10px;font-size:11.5px;color:var(--t2);min-width:0}
+.estf29 b{display:block;font-size:13px;color:var(--tinta);margin-top:2px}
+.estf29 div.alerta b{color:var(--rojo)}
+.obs .li:first-of-type{border-top:0}
+.obs .ic{font-size:18px;font-weight:800}
+.obs .chip{margin-top:6px}
+.obs .sm.bloque{margin-top:2px}
+.ok-txt{color:var(--verde);font-weight:700}
+.reco{padding:12px 0;border-top:1px solid var(--borde)}
+.reco:first-of-type{border-top:0}
+.reco .q{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px}
+.reco .q i{flex:none;width:10px;height:10px;border-radius:50%}
+.reco .q i.ambar{background:#E0A43A}.reco .q i.verde{background:#3FAE7A}.reco .q i.morado{background:var(--mc)}
+.reco p{margin:5px 0 0;font-size:13px;color:var(--t2)}
+.reco p b{color:var(--tinta);font-weight:600}
+.reco .reco-pie{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}

@@ -1,11 +1,11 @@
 // MiContadoor · service worker. Cachea SOLO los archivos propios de la app (esqueleto). NUNCA datos:
 // · toda petición a otro origen (Supabase, fuentes, WhatsApp) pasa directo a la red, sin tocar la caché;
 // · dentro del propio sitio solo se guarda lo que está en la lista ESQUELETO, y se usa SOLO sin conexión (red primero).
-const VERSION = 'mc-v1.0.0-3';
+const VERSION = 'mc-v1.0.0-4';
 const ESQUELETO = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/api.js', '/js/config.js', '/js/datos.js', '/js/demo.js', '/js/iconos.js', '/js/push.js', '/js/util.js',
-  '/js/vistas-acceso.js', '/js/vistas-comunes.js', '/js/vistas-cuenta.js', '/js/vistas-reporte.js',
+  '/js/vistas-acceso.js', '/js/vistas-comunes.js', '/js/vistas-cuenta.js', '/js/vistas-reporte.js', '/js/vistas-impuestos.js',
   '/img/contadoor_lockup_white.png', '/img/contadoor_lockup_glossy.png', '/img/icono-192.png', '/img/icono-512.png',
 ];
 

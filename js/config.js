@@ -16,6 +16,9 @@ export const CONFIG = Object.freeze({
     TERMINOS: 'aceptar_terminos',
     TRABAJOS: null,            // MC-5 aún NO instalado en Supabase → «aún no publicado». Al instalar MC-5: 'trabajos'
     SOLICITUD_PAGO: null,      // MC-3: p. ej. 'solicitud_pago_crear' cuando exista con su GO
+    // MC-IMP-1 «Tu IVA del mes» (mc.mis_impuestos). Publicar el portal DESPUÉS de instalar la migración 202611191200.
+    // Si hubiera que publicar antes, dejarlo en null: la pantalla vuelve al Pre-IVA de siempre («aún no publicado»).
+    IMPUESTOS: 'mis_impuestos',
   }),
 
   // Hosts desde los que se aceptan enlaces de documentos (PDF firmados de Storage). Vacío = no se enlaza nada.

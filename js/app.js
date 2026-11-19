@@ -2,12 +2,13 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, normalizarImpuestos } from './datos.js';
 import { html, urlSegura, CORREO } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
 import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
+import { vImpuestos } from './vistas-impuestos.js';
 import { registrarServiceWorker } from './push.js';
 
 const VERSION = '1.0.0';
@@ -17,7 +18,7 @@ const q = new URLSearchParams(location.search);
 const esDemo = q.get('demo') === '1';
 
 const st = {
-  api: null, sesion: null, empresa: null, resumen: null, perm: null, cargadoAt: 0,
+  api: null, sesion: null, empresa: null, resumen: null, perm: null, impuestos: null, cargadoAt: 0,
   mensaje: null, flash: null, tipoEnlace: 'invite', activado: false, enlacePendiente: null,
   abiertos: new Set(), solicitudes: new Set(), hoja: null, rutaPrevia: '',
 };
@@ -51,7 +52,7 @@ const WA_EQUIPO = wa(CONFIG.WHATSAPP_EQUIPO, 'Hola Contadoor 👋 Te escribo des
 
 function ctx() {
   return {
-    cfg: CONFIG, api: st.api, sesion: st.sesion, empresa: st.empresa, resumen: st.resumen, perm: st.perm, tema, version: VERSION,
+    cfg: CONFIG, api: st.api, sesion: st.sesion, empresa: st.empresa, resumen: st.resumen, perm: st.perm, impuestos: st.impuestos, tema, version: VERSION,
     abiertos: st.abiertos, solicitudes: st.solicitudes, waMejora: WA_MEJORA, waEquipo: WA_EQUIPO,
     enlaceDoc: (u) => urlSegura(u, CONFIG.HOSTS_DOCUMENTOS),
   };
@@ -65,7 +66,7 @@ function vista(r, a) {
     case 'historial': return vHistorial(c);
     case 'cuenta': return vCuenta(c, a);
     case 'pago': return vPago(c, a);
-    case 'preiva': return vPreIva(c);
+    case 'preiva': return st.impuestos ? vImpuestos(c, st.impuestos) : vPreIva(c);
     case 'prerenta': return vPreRenta(c);
     case 'trabajos': return vTrabajos(c);
     case 'mas': return vMas(c);
@@ -153,6 +154,15 @@ async function cargarResumen() {
     try { const t = await st.api.trabajos(st.empresa.ref); if (t) r = conTrabajos(r, t); }
     catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; r = conTrabajos(r, 'error'); }
   }
+  // MC-IMP-1: «Tu IVA del mes» (mc.mis_impuestos). Todo vínculo con la sección Pre-IVA (también Cumplimiento); si la RPC falla, la pantalla muestra un aviso
+  // (nunca cifras inventadas). null = RPC no configurada → se mantiene el Pre-IVA de siempre.
+  const pm = permisos(r);
+  let imp = null;
+  if (st.api.impuestos && pm.preIva !== 'sin_permiso') {   // Luciano 19-11: el plan Cumplimiento también ve su IVA del mes
+    try { const j = await st.api.impuestos(st.empresa.ref); imp = j ? normalizarImpuestos(j) : null; }
+    catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; imp = { estado: 'error' }; }
+  }
+  st.impuestos = imp;
   st.resumen = r;
   st.perm = permisos(st.resumen);
   st.cargadoAt = Date.now();
