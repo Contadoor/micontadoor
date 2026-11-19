@@ -111,6 +111,13 @@ export function crearApiReal(cfg) {
       if (periodo !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))) throw new ErrorApi('MC_DATOS');
       return rpc(cfg.RPC.IMPUESTOS, { p_ref: ref, p_periodo: periodo });
     },
+    /** REPORTE-AUTO C: el reporte mensual cerrado (foto). null si la RPC no está configurada. p_periodo 'AAAA-MM' o null (= el último cerrado). */
+    async reporte(ref, periodo = null) {
+      if (!cfg.RPC.REPORTE) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      if (periodo !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.REPORTE, { p_ref: ref, p_periodo: periodo });
+    },
     async solicitudPago(datos) {
       if (!cfg.RPC.SOLICITUD_PAGO) throw new ErrorApi('NO_DISPONIBLE');
       // Contrato por definir en MC-3 (crea tarea a Conciliación/analista; NUNCA marca el pago). El comprobante irá a Storage.
@@ -147,6 +154,11 @@ export function crearApiDemo(demo, opciones = {}) {
     },
     async impuestos(ref) {
       const r = demo.impuestos(ref, opciones);
+      if (!r) throw new ErrorApi('MC_SIN_ACCESO');
+      return espera(r);
+    },
+    async reporte(ref) {
+      const r = demo.reporte(ref, opciones);
       if (!r) throw new ErrorApi('MC_SIN_ACCESO');
       return espera(r);
     },

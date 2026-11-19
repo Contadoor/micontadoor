@@ -11,7 +11,7 @@
 //                       pago:{total,cuotas_total,pagado,pendiente,vencido,cuotas:[{n,monto,vence,estado,pagada_el}],factura} | {sin_permiso:true},
 //                       documentos:[{t,fecha,tipo}], documentos_retenidos }
 //   empresa_resumen sigue diciendo trabajos = {disponible:false}: la app reemplaza esa sección con normalizarTrabajos().
-import { UUID, pesos, parsePeriodo, comparaPeriodo, clp, fecha } from './util.js';
+import { UUID, pesos, parsePeriodo, comparaPeriodo, clp, fecha, periodoTitulo } from './util.js';
 
 export const SECCIONES = ['reporte', 'mi_cuenta', 'facturas', 'trabajos', 'pre_iva', 'pre_renta'];
 
@@ -335,4 +335,65 @@ export function recomendacionesImpuestos(n, hoy) {
       accion: `Ten disponibles ${clp(total)} antes del ${plazo}.`, quien: 'tu', plazo });
   }
   return out.sort((a, b) => b.impacto - a.impacto).slice(0, RECO.max);
+}
+
+// ── Reporte mensual cerrado (REPORTE-AUTO C) ──────────────────────────────────────────────────────────────────
+// Contrato (gestoor-backend, 202611211800_reporte_auto_c_micontadoor.sql): mc.mi_reporte(p_ref, p_periodo?) →
+//   { ok, ref, seccion:{ disponible:false } | { disponible:true, datos:{ periodo:'AAAA-MM', version, enviado_at, validado:true, estado, pagado,
+//       impuestos_estado, obligaciones:[{id, concepto, periodo, monto, vence|null, estado}], calculo:[{t, xs?, monto?|texto?, resta?, info?}],
+//       total_f29, rrhh:{estado:'listo'|'pendiente'|'no_aplica'}, servicios:{folio, monto, estado:'emitida'}|null,
+//       avisos:[{codigo:'F29_SIN_DECLARAR'|'RRHH_PENDIENTE'|'IU_PENDIENTE_RRHH', periodos?}], historial:[{periodo, enviado_at, f29}] } } }
+//   Es la FOTO que guardó el analista al cerrar: no cambia aunque después cambien los datos. Sin notas internas.
+const AVISOS_REPORTE = new Set(['F29_SIN_DECLARAR', 'RRHH_PENDIENTE', 'IU_PENDIENTE_RRHH']);
+const ESTADOS_OBLIG = new Set(['por_pagar', 'pagada', 'atrasada', 'anulada']);
+const PER_GUION = /^(20\d{2})-(0[1-9]|1[0-2])$/;
+/** Respuesta de mc.mi_reporte → sección 'reporte' que leen las pantallas. Fail-closed: lo que no se entiende, no se muestra. */
+export function normalizarReporte(j) {
+  const sec = j && j.ok === true ? j.seccion : null;
+  if (!sec || sec.disponible !== true || !sec.datos || typeof sec.datos !== 'object') return { disponible: false };
+  const d = sec.datos;
+  if (!PER_GUION.test(String(d.periodo)) || d.validado !== true) return { disponible: false };
+  const obligaciones = (Array.isArray(d.obligaciones) ? d.obligaciones : [])
+    .filter((o) => o && texto(o.concepto, 80) && PER_GUION.test(String(o.periodo)) && pesos(o.monto) !== null && ESTADOS_OBLIG.has(o.estado)).slice(0, 10)
+    .map((o) => ({ id: String(o.id ?? '').slice(0, 40), concepto: texto(o.concepto, 80), periodo: o.periodo, monto: pesos(o.monto),
+                   vence: fechaOk(o.vence), estado: o.estado }));
+  const calculo = (Array.isArray(d.calculo) ? d.calculo : []).filter((p) => p && texto(p.t, 80)).slice(0, 12).map((p) => {
+    const x = { t: texto(p.t, 80) };
+    if (texto(p.xs, 120)) x.xs = texto(p.xs, 120);
+    if (typeof p.texto === 'string') x.texto = texto(p.texto, 40) || '—'; else x.monto = pesos(p.monto) ?? 0;
+    if (p.resta === true) x.resta = true;
+    return x;
+  });
+  const s = d.servicios && typeof d.servicios === 'object' && pesos(d.servicios.monto) !== null
+    ? { folio: texto(d.servicios.folio, 60) || '—', monto: pesos(d.servicios.monto), estado: d.servicios.estado === 'pagada' ? 'pagada' : 'emitida' } : null;
+  const avisos = (Array.isArray(d.avisos) ? d.avisos : []).filter((a) => a && AVISOS_REPORTE.has(a.codigo)).map((a) => ({
+    codigo: a.codigo, periodos: (Array.isArray(a.periodos) ? a.periodos : []).filter((p) => PER_GUION.test(String(p))).slice(0, 12) }));
+  const historial = (Array.isArray(d.historial) ? d.historial : []).filter((h) => h && PER_GUION.test(String(h.periodo))).slice(0, 12)
+    .map((h) => ({ periodo: h.periodo, enviado_at: fechaOk(h.enviado_at), f29: pesos(h.f29) }));
+  const rr = ['listo', 'pendiente', 'no_aplica'].includes(d.rrhh?.estado) ? d.rrhh.estado : 'pendiente';
+  // «Pagado» solo si TODAS las obligaciones del mes vienen marcadas pagadas (hoy el servidor las manda «por_pagar»: Conciliación las marcará).
+  const delMes = obligaciones.filter((o) => o.periodo === d.periodo && o.estado !== 'anulada');
+  const pagado = delMes.length > 0 && delMes.every((o) => o.estado === 'pagada');
+  return { disponible: true, datos: {
+    periodo: d.periodo, enviado_at: fechaOk(d.enviado_at), validado: true, estado: 'confirmado', pagado,
+    total_pagado_mes: pagado ? delMes.reduce((x, o) => x + o.monto, 0) : null,
+    obligaciones, calculo, total_f29: pesos(d.total_f29), servicios: s, avisos, historial, rrhh: rr,
+  } };
+}
+/** Copia del resumen con la sección 'reporte' tomada de mc.mi_reporte. Sin permiso: no se toca. Error: «aún no publicado» con aviso. */
+export function conReporte(resumen, respuesta) {
+  if (!resumen || typeof resumen !== 'object') return resumen;
+  const e = estadoSeccion(resumen.secciones?.reporte);
+  if (e === 'sin_permiso' || e === 'bloqueada') return resumen;
+  const sec = respuesta === 'error' ? { disponible: false, error: true } : normalizarReporte(respuesta);
+  const prev = resumen.secciones?.reporte?.datos;
+  if (sec.disponible && prev && Array.isArray(prev.novedades)) sec.datos.novedades = prev.novedades;   // novedades del resumen (demo / MC-6)
+  return { ...resumen, secciones: { ...(resumen.secciones || {}), reporte: sec } };
+}
+/** Texto de un aviso del reporte para el cliente. */
+export function textoAvisoReporte(a) {
+  if (a?.codigo === 'F29_SIN_DECLARAR') return `Hay F29 sin declarar: ${a.periodos.map((p) => periodoTitulo(p)).join(', ')}. Tu equipo Contadoor te contactará para regularizarlos.`;
+  if (a?.codigo === 'RRHH_PENDIENTE') return 'Remuneraciones: aún en preparación. Te avisaremos cuando estén listas.';
+  if (a?.codigo === 'IU_PENDIENTE_RRHH') return 'El impuesto único de tus trabajadores se agrega cuando Remuneraciones quede lista.';
+  return null;
 }
