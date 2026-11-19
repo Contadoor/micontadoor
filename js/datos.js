@@ -230,7 +230,9 @@ export function conTrabajos(resumen, respuesta) {
 //                 iva_determinado, iva_pagar, remanente_siguiente, total, exenta},
 //     oficial:{fuente:'reporte', total, debito, credito, remanente, ppm, confirmado_en}|null   (MC-IMP-1b: solo el reporte),
 //     preiva_enviado:{total, debito, credito, remanente, ppm, enviado_en}|null   (sin reporte: Pre-IVA enviado por el analista),
-//     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}], cartas:{disponible} } }
+//     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}],
+//       cartas:{disponible, total_12_meses?, items?:[{categoria:'carta'|'notificacion', titulo, fecha, remitente, plazo, nueva}]},   (SII-OBS-2)
+//       cumplimiento:{disponible, cumple?, estado?, actualizado_en?, condiciones?:[{titulo, cumple}]} } }                        (SII-OBS-2)
 const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'no_declarado', 'por_declarar', 'sin_dato']);
 const TIPOS_OBS = new Set(['f29_observado', 'f29_en_revision', 'f29_no_declarado', 'f22_observacion']);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -279,8 +281,24 @@ export function normalizarImpuestos(j) {
                    codigo: texto(x.codigo, 20), texto: texto(x.texto, 200) }));
   return {
     estado: 'ok', periodo, vence, datos_al: fechaOk(j.datos_al), cobertura_completa: j.cobertura_completa === true,
-    est, oficial: of, preiva, f29, obs: { items, cartas: j.observaciones?.cartas?.disponible === true },
+    est, oficial: of, preiva, f29, obs: { items, cartas: normalizarCartas(j.observaciones?.cartas), cumplimiento: normalizarCumplimiento(j.observaciones?.cumplimiento) },
   };
+}
+
+// SII-OBS-2: cartas y notificaciones del SII (lista blanca) y situación de cumplimiento. Fail-closed: lo que no se entiende no se muestra.
+const CATEGORIAS_CARTA = new Set(['carta', 'notificacion']);
+export function normalizarCartas(c) {
+  if (!c || typeof c !== 'object' || c.disponible !== true) return { disponible: false, total: 0, items: [] };
+  const items = (Array.isArray(c.items) ? c.items : []).filter((x) => x && CATEGORIAS_CARTA.has(x.categoria) && texto(x.titulo, 200)).slice(0, 5)
+    .map((x) => ({ categoria: x.categoria, titulo: texto(x.titulo, 200), fecha: fechaOk(x.fecha), remitente: texto(x.remitente, 120), plazo: texto(x.plazo, 120), nueva: x.nueva === true }));
+  const total = Number.isInteger(c.total_12_meses) && c.total_12_meses >= items.length ? c.total_12_meses : items.length;
+  return { disponible: true, total, items };
+}
+export function normalizarCumplimiento(u) {
+  if (!u || typeof u !== 'object' || u.disponible !== true || typeof u.cumple !== 'boolean') return { disponible: false };
+  const condiciones = (Array.isArray(u.condiciones) ? u.condiciones : []).filter((x) => x && texto(x.titulo, 160)).slice(0, 10)
+    .map((x) => ({ titulo: texto(x.titulo, 160), cumple: typeof x.cumple === 'boolean' ? x.cumple : null }));
+  return { disponible: true, cumple: u.cumple, estado: texto(u.estado, 120), condiciones };
 }
 
 /** Monto principal: el del reporte validado; si no, el Pre-IVA enviado por el analista; si no, el cálculo con datos del SII (null = «Por confirmar»). */
