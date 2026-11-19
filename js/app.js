@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos, normalizarImpuestos, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte, normalizarAvisos } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte, normalizarAvisos } from './datos.js';
 import { html, urlSegura, CORREO, sha256Hex, UUID } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
@@ -214,6 +214,12 @@ async function cargarResumen() {
   if (st.api.trabajos && permisos(r).verTrabajos) {
     try { const t = await st.api.trabajos(st.empresa.ref); if (t) r = conTrabajos(r, t); }
     catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; r = conTrabajos(r, 'error'); }
+  }
+  // REPORTE-AUTO C: el reporte mensual viene de su propia RPC (mc.mi_reporte), solo la foto que cerró el analista.
+  // Si falla: «aún no publicado» (nunca datos inventados); sesión inválida o bloqueo cortan todo.
+  if (st.api.reporte && permisos(r).verReporte) {
+    try { const j = await st.api.reporte(st.empresa.ref); if (j) r = conReporte(r, j); }
+    catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; r = conReporte(r, 'error'); }
   }
   // MC-IMP-1: «Tu IVA del mes» (mc.mis_impuestos). Todo vínculo con la sección Pre-IVA (también Cumplimiento); si la RPC falla, la pantalla muestra un aviso
   // (nunca cifras inventadas). null = RPC no configurada → se mantiene el Pre-IVA de siempre.

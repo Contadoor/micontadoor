@@ -1,7 +1,7 @@
 // Inicio, Reporte mensual (con arrastre de lo impago) e Historial.
 import { html, clp, fecha, mesDe, periodoTitulo, MESES, parsePeriodo } from './util.js';
 import { I, } from './iconos.js';
-import { datosDe, calcularAcumulado, saldoFavorTexto } from './datos.js';
+import { datosDe, calcularAcumulado, saldoFavorTexto, textoAvisoReporte } from './datos.js';
 import { cabecera, sub, teaser, vacio, paso, waCard, chipEstadoProy } from './vistas-comunes.js';
 import { tarjetaIncorporacion } from './vistas-apertura.js';
 import { kpiImpuestos } from './vistas-impuestos.js';
@@ -81,9 +81,9 @@ export function vReporte(ctx) {
   const mes = mesDe(rep.periodo);
   const hayAnt = acu.anteriores.length > 0;
   const top = hayAnt
-    ? html`<div class="card osc"><div class="hd"><h2>Total a pagar</h2>${acu.incompleto ? html`<span class="chip c-pend">Falta confirmar</span>` : html`<span class="chip c-ok-d">Confirmado</span>`}</div><div class="big">${clp(acu.total)}</div>
+    ? html`<div class="card osc"><div class="hd"><h2>Total a pagar</h2>${acu.incompleto ? html`<span class="chip c-pend">Falta confirmar</span>` : html`<span class="chip c-ok-d">${rep.validado ? 'Validado por Contadoor' : 'Confirmado'}</span>`}</div><div class="big">${clp(acu.total)}</div>
         <div class="sm">Este mes ${clp(acu.totalMes)} + pendientes acumulados ${clp(acu.totalAnteriores)} (${listaMeses(acu.origenes)})${acu.incompleto ? ' · más los montos por confirmar' : ''}</div></div>`
-    : html`<div class="card osc"><div class="hd"><h2>Lo que pagas por ${mes}</h2><span class="chip c-ok-d">Confirmado</span></div>
+    : html`<div class="card osc"><div class="hd"><h2>Lo que pagas por ${mes}</h2><span class="chip c-ok-d">${rep.validado ? 'Validado por Contadoor' : 'Confirmado'}</span></div>
         <div class="big">${clp(rep.pagado ? rep.total_pagado_mes : acu.totalMes)}</div>
         <div class="sm">${(rep.obligaciones || []).filter((o) => o.periodo === rep.periodo).map((o, i) => html`${i ? ' + ' : ''}${o.concepto} ${clp(o.monto)} (vence ${fecha(o.vence)})`)}${rep.pagado ? ' · ya pagados ✓' : ''}</div></div>`;
   const arrastre = hayAnt ? html`<div class="card arrastre"><div class="hd"><h3>Pendientes de meses anteriores</h3></div>
@@ -92,15 +92,15 @@ export function vReporte(ctx) {
       <p class="xs m0 mt8">Cada mes se suman aquí todos los pagos que siguen pendientes, con su mes de origen, hasta que se paguen. Si pagas después de la fecha de vigencia, tu analista actualiza los montos.</p></div>
     <div class="card"><h3 class="t15">Este mes</h3>${acu.mes.map((o) => html`<div class="fila"><div class="t"><b>${o.concepto}</b><span class="xs">${o.fecha_interna ? html`Tu fecha para pagar: ${fecha(o.fecha_interna)} · ` : ''}vence ${fecha(o.vence)}</span></div><div class="v"><b>${clp(o.montoMostrado)}</b><span class="chip c-pend">Por pagar</span></div></div>`)}</div>` : '';
   const serv = ctx.perm.verFacturas && rep.servicios
-    ? html`<div class="fila"><div class="t"><b>Nuestros servicios del mes</b><span class="xs">Factura N° ${rep.servicios.folio} · ${mes}</span></div><div class="v"><b>${clp(rep.servicios.monto)}</b><span class="chip ${rep.servicios.estado === 'pagada' ? 'c-ok' : 'c-pend'}">${rep.servicios.estado === 'pagada' ? 'Pagada' : 'Por pagar'}</span></div></div>` : '';
+    ? html`<div class="fila"><div class="t"><b>Nuestros servicios del mes</b><span class="xs">Factura N° ${rep.servicios.folio} · ${mes}</span></div><div class="v"><b>${clp(rep.servicios.monto)}</b><span class="chip ${rep.servicios.estado === 'pagada' ? 'c-ok' : rep.servicios.estado === 'emitida' ? 'c-gris' : 'c-pend'}">${rep.servicios.estado === 'pagada' ? 'Pagada' : rep.servicios.estado === 'emitida' ? 'Emitida' : 'Por pagar'}</span></div></div>` : '';
   return html`${sub('Reporte mensual', { chip: html`<span class="chip c-conc">${periodoTitulo(rep.periodo)}</span>` })}<div class="sec">
     <div class="seg" role="group" aria-label="Vista"><button type="button" class="on" aria-pressed="true">Este mes</button><button type="button" data-ir="historial" aria-pressed="false">Historial</button></div>
-    ${top}${arrastre}
+    ${top}${(rep.avisos || []).map((a) => { const t = textoAvisoReporte(a); return t ? html`<div class="aviso" role="note">${I.info}<div>${t}</div></div>` : ''; })}${arrastre}
     ${rep.calculo?.length ? html`<div class="card"><h3 class="t15">¿Cómo llegamos a tu impuesto?</h3>${rep.calculo.map(paso)}<div class="total-l"><span>Total F29</span><span>${clp(rep.total_f29)}</span></div></div>` : ''}
     ${rep.comentario ? html`<div class="nota"><b>Comentario de tu analista</b><div class="cuerpo">"${rep.comentario}"</div></div>` : ''}
     ${serv || rep.ppm_acumulado != null ? html`<div class="card">${serv}${rep.ppm_acumulado != null ? html`<div class="fila"><div class="t"><b>PPM acumulado del año</b><span class="xs">a cuenta de la renta de abril</span></div><div class="v"><b>${clp(rep.ppm_acumulado)}</b></div></div>` : ''}</div>` : ''}
     ${ctx.enlaceDoc(rep.pdf_url) ? html`<a class="btn lin" href="${ctx.enlaceDoc(rep.pdf_url)}" target="_blank" rel="noopener noreferrer">Descargar el reporte (PDF)</a>` : html`<button type="button" class="btn lin" disabled>Descargar el reporte (PDF) <span class="prox">Próximamente</span></button>`}
-    <p class="xs c mt8">Es el mismo reporte que te enviamos por correo el ${fecha(rep.enviado_at)}.</p></div>`;
+    <p class="xs c mt8">${rep.validado ? html`Validado y cerrado por tu equipo Contadoor el ${fecha(rep.enviado_at)}. Queda guardado tal cual.` : html`Es el mismo reporte que te enviamos por correo el ${fecha(rep.enviado_at)}.`}</p></div>`;
 }
 
 export function vHistorial(ctx) {
