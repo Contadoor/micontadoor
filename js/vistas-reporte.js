@@ -3,6 +3,7 @@ import { html, clp, fecha, mesDe, periodoTitulo, MESES, parsePeriodo } from './u
 import { I, } from './iconos.js';
 import { datosDe, calcularAcumulado, saldoFavorTexto } from './datos.js';
 import { cabecera, sub, teaser, vacio, paso, waCard, chipEstadoProy } from './vistas-comunes.js';
+import { kpiImpuestos } from './vistas-impuestos.js';
 
 const ICO_NOV = { reporte: ['i-a', I.grafico], pago: ['i-v', I.check], proy: ['i-i', I.calendario], te: ['i-m', I.llave] };
 
@@ -41,9 +42,9 @@ export function vInicio(ctx) {
   if (ctx.perm.preIva === 'bloqueada' || ctx.perm.preRenta === 'bloqueada') {
     proy = teaser('Pre-IVA y Pre-Renta', [['IVA estimado del mes', '$•••.•••'], ['Renta proyectada', '$•.•••.•••']],
       ['Sabe antes cuánto viene de IVA cada mes', 'Proyección de tu renta anual para llegar a abril preparado'], ctx.waMejora);
-  } else if (piv || pre) {
+  } else if (piv || pre || ctx.impuestos?.estado === 'ok') {
     proy = html`<div class="kpis mb">
-      ${piv ? html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>Pre-IVA</b>${chipEstadoProy(piv.estado)}</div><div class="mid s21">${clp(piv.estimado, { aprox: true })}</div><div class="xs">IVA de ${mesDe(piv.periodo)} a hoy</div></button>` : html`<span></span>`}
+      ${ctx.impuestos?.estado === 'ok' ? kpiImpuestos(ctx.impuestos) : piv ? html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>Pre-IVA</b>${chipEstadoProy(piv.estado)}</div><div class="mid s21">${clp(piv.estimado, { aprox: true })}</div><div class="xs">IVA de ${mesDe(piv.periodo)} a hoy</div></button>` : html`<span></span>`}
       ${pre ? html`<button type="button" class="card kpi-btn" data-ir="prerenta"><div class="hd"><b>Pre-Renta</b><span class="chip c-proy">Proyección</span></div><div class="mid s21">${clp(pre.impuesto, { aprox: true })}</div><div class="xs">Renta AT ${pre.anio_tributario}</div></button>` : ''}
     </div>`;
   }

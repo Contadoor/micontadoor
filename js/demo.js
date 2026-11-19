@@ -36,6 +36,29 @@ const PRERENTA = {
   nota: '¿Planeas una inversión grande antes de diciembre? Cuéntanos: puede cambiar tu renta.',
 };
 
+// «Tu IVA del mes» (forma de mc.mis_impuestos). Cifras ficticias, coherentes con la maqueta aprobada el 19-11.
+const IMPUESTOS_RIO = {
+  ok: true, ref: REF.rio, periodo: '202610', conexion: { estado: 'conectado', carga_inicial_lista: true },
+  datos_al: '2026-11-18T10:25:00Z', cobertura_completa: true, vence: '2026-11-20',
+  estimacion: {
+    debito: 1748000, credito: 969000, ventas_neto: 9200000, ventas_exento: 350000, ventas_documentos: 18, compras_documentos: 41, compras_neto: 5100000, compras_exento: 0,
+    compras_pendientes: { documentos: 2, iva: 85500 },
+    remanente: { monto: 118868, cod77: 118000, periodo: '202609', utm_origen: 72151, utm_destino: 72440 }, remanente_motivo: null,
+    ppm_base: 9550000, ppm_tasa: 2.5, ppm_tasa_fuente: 'sii', ppm: 238750,
+    iva_determinado: 660132, iva_pagar: 660132, remanente_siguiente: 0, total: 898882, exenta: false,
+  },
+  oficial: null,
+  f29: [
+    { periodo: '202610', estado: 'por_declarar', vence: '2026-11-20', total: null },
+    { periodo: '202609', estado: 'declarado', vence: '2026-10-20', total: 640000 },
+    { periodo: '202608', estado: 'declarado', vence: '2026-09-21', total: 610000 },
+    { periodo: '202607', estado: 'declarado', vence: '2026-08-20', total: 700000 },
+    { periodo: '202606', estado: 'declarado', vence: '2026-07-20', total: 655000 },
+    { periodo: '202605', estado: 'declarado', vence: '2026-06-22', total: 690000 },
+  ],
+  observaciones: { items: [{ tipo: 'f22_observacion', anio_tributario: 2026, codigo: 'F135', texto: 'Diferencia en los retiros informados por la empresa (ejemplo).' }], cartas: { disponible: false } },
+};
+
 const DATOS = {
   [REF.rio]: {
     reporte: {
@@ -240,5 +263,14 @@ export const demo = {
       else if (!verFact) t.pago.factura = { sin_permiso: true };
     }
     return { ok: true, ref, seccion: { disponible: true, datos: d } };
+  },
+  /** Igual que mc.mis_impuestos (MC-IMP-1). Río: conectada al SII; Aromos (Cumplimiento): bloqueada; Alerce: aún no conectada. */
+  impuestos(ref, opciones = {}) {
+    const e = EMPRESAS.find((x) => x.ref === ref);
+    if (!e) return null;
+    const nivel = opciones.plan === 'cumpl' ? 'basico' : e.plan_nivel;
+    if (nivel !== 'pro') return { ok: true, ref, periodo: '202610', bloqueada: true, mejora: 'comercial' };
+    if (ref !== REF.rio) return { ok: true, ref, periodo: '202610', conexion: { estado: 'no_conectado' }, oficial: null, vence: '2026-11-20' };
+    return clon(IMPUESTOS_RIO);
   },
 };
