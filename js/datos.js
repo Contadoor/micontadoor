@@ -233,7 +233,9 @@ export function conTrabajos(resumen, respuesta) {
 //     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}],
 //       cartas:{disponible, total_12_meses?, items?:[{categoria:'carta'|'notificacion', titulo, fecha, remitente, plazo, nueva}]},   (SII-OBS-2)
 //       cumplimiento:{disponible, cumple?, estado?, actualizado_en?, condiciones?:[{titulo, cumple}]} } }                        (SII-OBS-2)
-const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'no_declarado', 'por_declarar', 'sin_dato']);
+// R2 (AUTO-C02/C03): 'sin_verificar' = declarado con una letra del SII fuera de la clasificación; 'no_encontrado' = no aparece en una
+// lectura hecha antes del vencimiento (se verifica; no es «no declarado»).
+const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'sin_verificar', 'no_declarado', 'no_encontrado', 'por_declarar', 'sin_dato']);
 const TIPOS_OBS = new Set(['f29_observado', 'f29_en_revision', 'f29_no_declarado', 'f22_observacion']);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const AAAAMM = /^(20\d{2})(0[1-9]|1[0-2])$/;
@@ -361,10 +363,13 @@ export function recomendacionesImpuestos(n, hoy) {
 //       impuestos_estado, obligaciones:[{id, concepto, periodo, monto, vence|null, estado}], calculo:[{t, xs?, monto?|texto?, resta?, info?}],
 //       total_f29, rrhh:{estado:'listo'|'pendiente'|'no_aplica'}, servicios:{folio, monto, estado:'emitida'}|null,
 //       avisos:[{codigo:'F29_DECLARADO'|'F29_SIN_DECLARAR'|'F29_OBSERVADO'|'F29_EN_REVISION', periodos}
-//               | {codigo:'SII_OBSERVACIONES', cartas, cumple, f22} | {codigo:'IU_PENDIENTE_RRHH'}], historial:[{periodo, enviado_at, f29}] } } }
+//               | {codigo:'F29_ESTADO_SIN_VERIFICAR', periodos} | {codigo:'SII_OBSERVACIONES', cartas, cumple, f22} | {codigo:'IU_PENDIENTE_RRHH'}],
+//       historial:[{periodo, enviado_at, f29}],
+//       foto:{al_cierre:true, cerrado_at, version},                                    (R2 · AUTO-C01: todo lo anterior es la foto del cierre)
+//       situacion_actual:{consultado_en, periodo, f29_estado, f29_vence} } } }         (R2 · AUTO-C01: el F29 de ese período HOY en el SII)
 //   Es la FOTO que guardó el analista al cerrar: no cambia aunque después cambien los datos. Sin notas internas.
 //   Decisión de Luciano 19-11: el cliente ve TODO lo del SII (lo declarado, lo no declarado y lo observado).
-const AVISOS_REPORTE = new Set(['F29_DECLARADO', 'F29_SIN_DECLARAR', 'F29_OBSERVADO', 'F29_EN_REVISION', 'SII_OBSERVACIONES', 'IU_PENDIENTE_RRHH']);
+const AVISOS_REPORTE = new Set(['F29_DECLARADO', 'F29_SIN_DECLARAR', 'F29_OBSERVADO', 'F29_EN_REVISION', 'F29_ESTADO_SIN_VERIFICAR', 'SII_OBSERVACIONES', 'IU_PENDIENTE_RRHH']);
 const entero = (n) => (Number.isInteger(n) && n >= 0 && n <= 9999 ? n : 0);
 const ESTADOS_OBLIG = new Set(['por_pagar', 'pagada', 'atrasada', 'anulada']);
 const PER_GUION = /^(20\d{2})-(0[1-9]|1[0-2])$/;
@@ -394,6 +399,9 @@ export function normalizarReporte(j) {
   const historial = (Array.isArray(d.historial) ? d.historial : []).filter((h) => h && PER_GUION.test(String(h.periodo))).slice(0, 12)
     .map((h) => ({ periodo: h.periodo, enviado_at: fechaOk(h.enviado_at), f29: pesos(h.f29) }));
   const rr = ['listo', 'pendiente', 'no_aplica'].includes(d.rrhh?.estado) ? d.rrhh.estado : 'pendiente';
+  // AUTO-C01: la situación ACTUAL del F29 de ese período (calculada al consultar) va aparte de la foto. Lista blanca de campos.
+  const sa = d.situacion_actual && typeof d.situacion_actual === 'object' && ESTADOS_F29.has(d.situacion_actual.f29_estado) && PER_GUION.test(String(d.situacion_actual.periodo))
+    ? { consultado_en: fechaOk(d.situacion_actual.consultado_en), periodo: d.situacion_actual.periodo, f29_estado: d.situacion_actual.f29_estado, f29_vence: fechaOk(d.situacion_actual.f29_vence) } : null;
   // «Pagado» solo si TODAS las obligaciones del mes vienen marcadas pagadas (hoy el servidor las manda «por_pagar»: Conciliación las marcará).
   const delMes = obligaciones.filter((o) => o.periodo === d.periodo && o.estado !== 'anulada');
   const pagado = delMes.length > 0 && delMes.every((o) => o.estado === 'pagada');
@@ -401,6 +409,7 @@ export function normalizarReporte(j) {
     periodo: d.periodo, enviado_at: fechaOk(d.enviado_at), validado: true, estado: 'confirmado', pagado,
     total_pagado_mes: pagado ? delMes.reduce((x, o) => x + o.monto, 0) : null,
     obligaciones, calculo, total_f29: pesos(d.total_f29), servicios: s, avisos, historial, rrhh: rr,
+    cerrado_at: fechaOk(d.foto?.cerrado_at) || fechaOk(d.enviado_at), situacion_actual: sa,
   } };
 }
 /** Copia del resumen con la sección 'reporte' tomada de mc.mi_reporte. Sin permiso: no se toca. Error: «aún no publicado» con aviso. */
@@ -413,6 +422,12 @@ export function conReporte(resumen, respuesta) {
   if (sec.disponible && prev && Array.isArray(prev.novedades)) sec.datos.novedades = prev.novedades;   // novedades del resumen (demo / MC-6)
   return { ...resumen, secciones: { ...(resumen.secciones || {}), reporte: sec } };
 }
+/** Situación ACTUAL del F29 del período (AUTO-C01/C03), en palabras para el cliente. */
+export function textoSituacionF29(e) {
+  return ({ declarado: 'Declarado en el SII ✓', observado: 'Con observación del SII', en_revision: 'En revisión del SII', sin_verificar: 'Declarado · estado del SII por verificar',
+            por_declarar: 'Por declarar (aún en plazo)', no_declarado: 'No declarado', no_encontrado: 'No lo encontramos en el SII: lo estamos verificando',
+            sin_dato: 'Aún sin dato del SII' })[e] || null;
+}
 /** Texto de un aviso del reporte para el cliente. */
 export function textoAvisoReporte(a) {
   const meses = () => a.periodos.map((p) => periodoTitulo(p)).join(', ');
@@ -420,6 +435,7 @@ export function textoAvisoReporte(a) {
   if (a?.codigo === 'F29_SIN_DECLARAR') return `Hay F29 sin declarar: ${meses()}. Tu equipo Contadoor te contactará para regularizarlos.`;
   if (a?.codigo === 'F29_OBSERVADO') return `El SII observó el F29 de: ${meses()}. Tu equipo Contadoor lo está revisando.`;
   if (a?.codigo === 'F29_EN_REVISION') return `F29 en revisión en el SII: ${meses()}.`;
+  if (a?.codigo === 'F29_ESTADO_SIN_VERIFICAR') return `F29 declarados con un estado del SII que tu equipo Contadoor está verificando: ${meses()}.`;
   if (a?.codigo === 'SII_OBSERVACIONES') {
     const p = [];
     if (a.cartas > 0) p.push(a.cartas === 1 ? 'tienes 1 carta o notificación del SII en los últimos 12 meses' : `tienes ${a.cartas} cartas o notificaciones del SII en los últimos 12 meses`);

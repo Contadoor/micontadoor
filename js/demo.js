@@ -281,7 +281,9 @@ export const demo = {
       servicios: verFact && r.servicios ? { folio: r.servicios.folio, monto: r.servicios.monto, estado: r.servicios.estado === 'pagada' ? 'pagada' : 'emitida' } : null,
       avisos: ref === REF.aromos ? [{ codigo: 'F29_DECLARADO', periodos: ['2026-05', '2026-06', '2026-09'] }, { codigo: 'F29_SIN_DECLARAR', periodos: ['2026-07', '2026-08'] },
                                     { codigo: 'SII_OBSERVACIONES', cartas: 1, cumple: false, f22: 0 }] : [],
-      historial: r.historial || [{ periodo: r.periodo, enviado_at: r.enviado_at, f29: r.total_f29 }] };
+      historial: r.historial || [{ periodo: r.periodo, enviado_at: r.enviado_at, f29: r.total_f29 }],
+      foto: { al_cierre: true, cerrado_at: r.enviado_at, version: 1 },
+      situacion_actual: { consultado_en: new Date().toISOString(), periodo: r.periodo, f29_estado: ref === REF.aromos ? 'declarado' : 'por_declarar', f29_vence: null } };
     return { ok: true, ref, seccion: { disponible: true, datos } };
   },
   /** Igual que mc.mis_impuestos (MC-IMP-1 + 1b). Río: Pre-IVA estimado; Aromos (Cumplimiento): reporte validado; Alerce: aún no conectada. */

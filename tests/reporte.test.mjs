@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { demo } from '../js/demo.js';
-import { permisos, conReporte, normalizarReporte, datosDe, textoAvisoReporte } from '../js/datos.js';
+import { permisos, conReporte, normalizarReporte, datosDe, textoAvisoReporte, textoSituacionF29 } from '../js/datos.js';
 import { CONFIG } from '../js/config.js';
 import { vInicio, vReporte, vHistorial } from '../js/vistas-reporte.js';
 
@@ -78,4 +78,32 @@ test('pagado solo si todas las obligaciones del mes vienen pagadas (Río demo: P
   const n = normalizarReporte(demo.reporte(demo.refs.rio));
   assert.equal(n.datos.pagado, true); assert.equal(n.datos.total_pagado_mes, 830000);
   assert.equal(normalizarReporte(base()).datos.pagado, false);
+});
+// ── R2 (dictamen 19-11) ──
+test('R2 · AUTO-C01: foto al cierre y situación actual separadas; lista blanca de campos', () => {
+  const j = base(); const d = j.seccion.datos;
+  d.foto = { al_cierre: true, cerrado_at: '2026-11-21T15:00:00Z', version: 1, cerrado_por: 'NOMBRE INTERNO' };
+  d.situacion_actual = { consultado_en: '2026-11-25T10:00:00Z', periodo: '2026-10', f29_estado: 'declarado', f29_vence: '2026-11-20', interno: 'x' };
+  const n = normalizarReporte(j);
+  assert.deepEqual(n.datos.situacion_actual, { consultado_en: '2026-11-25T10:00:00Z', periodo: '2026-10', f29_estado: 'declarado', f29_vence: '2026-11-20' });
+  assert.equal(n.datos.cerrado_at, '2026-11-21T15:00:00Z');
+  assert.ok(!JSON.stringify(n).includes('NOMBRE INTERNO'));
+  const s = String(vReporte(ctx(conReporte(demo.resumen(demo.refs.rio), j))));
+  assert.ok(s.includes('Según el SII al cierre del') && s.includes('Hoy en el SII') && s.includes('Declarado en el SII ✓'));
+  assert.ok(s.includes('queda tal como se validó al cierre'));
+});
+test('R2 · situación actual con estado desconocido o con HTML → no se muestra (fail-closed)', () => {
+  const j = base(); j.seccion.datos.situacion_actual = { consultado_en: 'x', periodo: '2026-10', f29_estado: '<script>alert(1)</script>' };
+  assert.equal(normalizarReporte(j).datos.situacion_actual, null);
+  assert.ok(!String(vReporte(ctx(conReporte(demo.resumen(demo.refs.rio), j)))).includes('Hoy en el SII'));
+});
+test('R2 · AUTO-C02/C03: aviso de estado por verificar y textos de la situación (no encontrado ≠ no declarado)', () => {
+  const j = base(); j.seccion.datos.avisos.push({ codigo: 'F29_ESTADO_SIN_VERIFICAR', periodos: ['2026-09'] }, { codigo: 'F29_NO_ENCONTRADO', periodos: ['2026-08'] });
+  const n = normalizarReporte(j);
+  assert.ok(n.datos.avisos.some((a) => a.codigo === 'F29_ESTADO_SIN_VERIFICAR'));
+  assert.ok(!n.datos.avisos.some((a) => a.codigo === 'F29_NO_ENCONTRADO'), 'no encontrado es interno: no llega al cliente');
+  assert.match(textoAvisoReporte({ codigo: 'F29_ESTADO_SIN_VERIFICAR', periodos: ['2026-09'] }), /verificando: Septiembre 2026/);
+  assert.match(textoSituacionF29('no_encontrado'), /verificando/);
+  assert.equal(textoSituacionF29('no_declarado'), 'No declarado');
+  assert.equal(textoSituacionF29('raro'), null);
 });
