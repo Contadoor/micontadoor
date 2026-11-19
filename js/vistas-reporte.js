@@ -1,7 +1,7 @@
 // Inicio, Reporte mensual (con arrastre de lo impago) e Historial.
 import { html, clp, fecha, mesDe, periodoTitulo, MESES, parsePeriodo } from './util.js';
 import { I, } from './iconos.js';
-import { datosDe, calcularAcumulado, saldoFavorTexto, textoAvisoReporte } from './datos.js';
+import { datosDe, calcularAcumulado, saldoFavorTexto, textoAvisoReporte, textoSituacionF29 } from './datos.js';
 import { cabecera, sub, teaser, vacio, paso, waCard, chipEstadoProy } from './vistas-comunes.js';
 import { tarjetaIncorporacion } from './vistas-apertura.js';
 import { kpiImpuestos } from './vistas-impuestos.js';
@@ -74,6 +74,20 @@ function filaPendiente(o) {
     <div class="v">${o.porConfirmar ? html`<b>Por confirmar</b><span class="chip c-gris">Pendiente</span>` : html`<b>${clp(o.montoMostrado)}</b><span class="chip ${o.estado === 'atrasada' ? 'c-venc' : 'c-pend'}">${o.estado === 'atrasada' ? 'Atrasado' : 'Por pagar'}</span>`}</div></div>`;
 }
 
+// AUTO-C01: los avisos del SII son los de la FOTO (al cierre); la situación de HOY del F29 del período va aparte y se rotula así.
+function avisosAlCierre(rep) {
+  const t = (rep.avisos || []).map(textoAvisoReporte).filter(Boolean);
+  if (!t.length) return '';
+  return html`<p class="xs m0 mt8">Según el SII al cierre del ${fecha(rep.cerrado_at || rep.enviado_at)}:</p>${t.map((x) => html`<div class="aviso" role="note">${I.info}<div>${x}</div></div>`)}`;
+}
+function situacionHoy(rep) {
+  const s = rep.situacion_actual; const t = s && textoSituacionF29(s.f29_estado);
+  if (!t) return '';
+  return html`<div class="card"><div class="hd"><h3 class="t15">Hoy en el SII</h3><span class="chip c-gris">Actualizado</span></div>
+    <div class="fila"><div class="t"><b>F29 de ${mesDe(s.periodo)}</b><span class="xs">${s.f29_vence ? html`vence el ${fecha(s.f29_vence)} · ` : ''}consultado el ${fecha(s.consultado_en)}</span></div><div class="v"><b>${t}</b></div></div>
+    <p class="xs m0 mt8">Esto es la situación actual; tu reporte de arriba queda tal como se validó al cierre.</p></div>`;
+}
+
 export function vReporte(ctx) {
   const rep = datosDe(ctx.resumen, 'reporte');
   if (!rep) return html`${sub('Reporte mensual')}<div class="sec">${vacio(I.grafico, 'Tu reporte aún no está publicado', 'Cuando tu analista envíe el reporte del mes, aparecerá aquí, igual al que recibes por correo.')}</div>`;
@@ -95,7 +109,7 @@ export function vReporte(ctx) {
     ? html`<div class="fila"><div class="t"><b>Nuestros servicios del mes</b><span class="xs">Factura N° ${rep.servicios.folio} · ${mes}</span></div><div class="v"><b>${clp(rep.servicios.monto)}</b><span class="chip ${rep.servicios.estado === 'pagada' ? 'c-ok' : rep.servicios.estado === 'emitida' ? 'c-gris' : 'c-pend'}">${rep.servicios.estado === 'pagada' ? 'Pagada' : rep.servicios.estado === 'emitida' ? 'Emitida' : 'Por pagar'}</span></div></div>` : '';
   return html`${sub('Reporte mensual', { chip: html`<span class="chip c-conc">${periodoTitulo(rep.periodo)}</span>` })}<div class="sec">
     <div class="seg" role="group" aria-label="Vista"><button type="button" class="on" aria-pressed="true">Este mes</button><button type="button" data-ir="historial" aria-pressed="false">Historial</button></div>
-    ${top}${(rep.avisos || []).map((a) => { const t = textoAvisoReporte(a); return t ? html`<div class="aviso" role="note">${I.info}<div>${t}</div></div>` : ''; })}${arrastre}
+    ${top}${avisosAlCierre(rep)}${situacionHoy(rep)}${arrastre}
     ${rep.calculo?.length ? html`<div class="card"><h3 class="t15">¿Cómo llegamos a tu impuesto?</h3>${rep.calculo.map(paso)}<div class="total-l"><span>Total F29</span><span>${clp(rep.total_f29)}</span></div></div>` : ''}
     ${rep.comentario ? html`<div class="nota"><b>Comentario de tu analista</b><div class="cuerpo">"${rep.comentario}"</div></div>` : ''}
     ${serv || rep.ppm_acumulado != null ? html`<div class="card">${serv}${rep.ppm_acumulado != null ? html`<div class="fila"><div class="t"><b>PPM acumulado del año</b><span class="xs">a cuenta de la renta de abril</span></div><div class="v"><b>${clp(rep.ppm_acumulado)}</b></div></div>` : ''}</div>` : ''}
