@@ -107,3 +107,15 @@ test('R2 · AUTO-C02/C03: aviso de estado por verificar y textos de la situació
   assert.equal(textoSituacionF29('no_declarado'), 'No declarado');
   assert.equal(textoSituacionF29('raro'), null);
 });
+
+// REPORTE-AUTO R3 (flujo 19-11): el reporte se cierra en Contable después de validar el IVA. Una empresa NO conectada al SII (validada
+// con libros) llega sin avisos del SII ni situación de hoy: el portal muestra igual el reporte validado, sin inventar «Según el SII».
+test('R3 · reporte validado en Contable de una empresa sin SII: «Validado por Contadoor» sin avisos del SII', () => {
+  const j = base(); j.seccion.datos.avisos = []; delete j.seccion.datos.situacion_actual;
+  const n = normalizarReporte(j);
+  assert.equal(n.disponible, true); assert.deepEqual(n.datos.avisos, []);
+  const s = String(vReporte(ctx(conReporte(demo.resumen(demo.refs.rio), j))));
+  assert.ok(s.includes('Validado por Contadoor'));
+  assert.ok(!s.includes('Según el SII al cierre') && !s.includes('Hoy en el SII'));
+  assert.ok(!/Pre-IVA|pasar al reporte/i.test(s), 'el reporte cerrado no habla del Pre-IVA');
+});
