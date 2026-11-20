@@ -90,6 +90,9 @@ function situacionHoy(rep) {
 
 export function vReporte(ctx) {
   const rep = datosDe(ctx.resumen, 'reporte');
+  const secRep = ctx.resumen?.secciones?.reporte;
+  // R4 · D6: el Master reabrió el reporte publicado → «Información en revisión» (sin montos ni obligaciones hasta que se publique de nuevo).
+  if (!rep && secRep?.en_revision) return html`${sub('Reporte mensual', { chip: html`<span class="chip c-pend">Información en revisión</span>` })}<div class="sec">${vacio(I.grafico, 'Información en revisión', `Tu equipo Contadoor está revisando nuevamente el reporte de ${mesDe(secRep.periodo)}. Cuando lo publique de nuevo, aparecerá aquí.`)}</div>`;
   if (!rep) return html`${sub('Reporte mensual')}<div class="sec">${vacio(I.grafico, 'Tu reporte aún no está publicado', 'Cuando tu analista envíe el reporte del mes, aparecerá aquí, igual al que recibes por correo.')}</div>`;
   const acu = calcularAcumulado(rep.obligaciones, rep.periodo);
   const mes = mesDe(rep.periodo);
@@ -109,7 +112,7 @@ export function vReporte(ctx) {
     ? html`<div class="fila"><div class="t"><b>Nuestros servicios del mes</b><span class="xs">Factura N° ${rep.servicios.folio} · ${mes}</span></div><div class="v"><b>${clp(rep.servicios.monto)}</b><span class="chip ${rep.servicios.estado === 'pagada' ? 'c-ok' : rep.servicios.estado === 'emitida' ? 'c-gris' : 'c-pend'}">${rep.servicios.estado === 'pagada' ? 'Pagada' : rep.servicios.estado === 'emitida' ? 'Emitida' : 'Por pagar'}</span></div></div>` : '';
   return html`${sub('Reporte mensual', { chip: html`<span class="chip c-conc">${periodoTitulo(rep.periodo)}</span>` })}<div class="sec">
     <div class="seg" role="group" aria-label="Vista"><button type="button" class="on" aria-pressed="true">Este mes</button><button type="button" data-ir="historial" aria-pressed="false">Historial</button></div>
-    ${top}${avisosAlCierre(rep)}${situacionHoy(rep)}${arrastre}
+    ${top}${rep.rrhh === 'verificando' ? html`<div class="card"><div class="fila"><div class="t"><b>Remuneraciones</b><span class="xs">Estamos verificando la información de este período.</span></div></div></div>` : ''}${avisosAlCierre(rep)}${situacionHoy(rep)}${arrastre}
     ${rep.calculo?.length ? html`<div class="card"><h3 class="t15">¿Cómo llegamos a tu impuesto?</h3>${rep.calculo.map(paso)}<div class="total-l"><span>Total F29</span><span>${clp(rep.total_f29)}</span></div></div>` : ''}
     ${rep.comentario ? html`<div class="nota"><b>Comentario de tu analista</b><div class="cuerpo">"${rep.comentario}"</div></div>` : ''}
     ${serv || rep.ppm_acumulado != null ? html`<div class="card">${serv}${rep.ppm_acumulado != null ? html`<div class="fila"><div class="t"><b>PPM acumulado del año</b><span class="xs">a cuenta de la renta de abril</span></div><div class="v"><b>${clp(rep.ppm_acumulado)}</b></div></div>` : ''}</div>` : ''}

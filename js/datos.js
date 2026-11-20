@@ -233,12 +233,18 @@ export function conTrabajos(resumen, respuesta) {
 //                 remanente:{monto,cod77,periodo,utm_origen,utm_destino}|null, remanente_motivo, ppm_base, ppm_tasa, ppm_tasa_fuente, ppm,
 //                 iva_determinado, iva_pagar, remanente_siguiente, total, exenta},
 //     oficial:{fuente:'reporte', total, debito, credito, remanente, ppm, confirmado_en}|null   (MC-IMP-1b: solo el reporte),
-//     preiva_enviado:{total, debito, credito, remanente, ppm, enviado_en}|null   (sin reporte: Pre-IVA enviado por el analista),
+//     preiva_enviado:{total, debito, credito, remanente, ppm, enviado_en}|null   (R4: solo llega con estado_iva 'revisado'),
+//     estado_iva:'estimado'|'revisado'|'publicado'|'en_revision'   (REPORTE-AUTO C R4 · D6: lo decide el SERVIDOR),
+//     revisado:{debito, credito, remanente, ppm, total, validado_en}|null   (R4: IVA validado en Contable, aún sin publicar),
 //     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}],
 //       cartas:{disponible, total_12_meses?, items?:[{categoria:'carta'|'notificacion', titulo, fecha, remitente, plazo, nueva}]},   (SII-OBS-2)
 //       cumplimiento:{disponible, cumple?, estado?, actualizado_en?, condiciones?:[{titulo, cumple}]} } }                        (SII-OBS-2)
 // R2 (AUTO-C02/C03): 'sin_verificar' = declarado con una letra del SII fuera de la clasificación; 'no_encontrado' = no aparece en una
 // lectura hecha antes del vencimiento (se verifica; no es «no declarado»).
+const ESTADOS_IVA = new Set(['estimado', 'revisado', 'publicado', 'en_revision']);
+/** Textos de los estados del IVA del período (REPORTE-AUTO R4 · D6). */
+export const TEXTO_ESTADO_IVA = { estimado: 'IVA estimado', revisado: 'IVA revisado, pendiente de publicación definitiva',
+  publicado: 'Reporte mensual publicado', en_revision: 'Información en revisión' };
 const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'sin_verificar', 'no_declarado', 'no_encontrado', 'por_declarar', 'sin_dato']);
 const TIPOS_OBS = new Set(['f29_observado', 'f29_en_revision', 'f29_no_declarado', 'f22_observacion']);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -260,11 +266,16 @@ export function normalizarImpuestos(j) {
   const of = j.oficial && typeof j.oficial === 'object' && j.oficial.fuente === 'reporte' && pesos(j.oficial.total) !== null
     ? { fuente: 'reporte', total: pesos(j.oficial.total), debito: pesos(j.oficial.debito), credito: pesos(j.oficial.credito),
         remanente: pesos(j.oficial.remanente), ppm: pesos(j.oficial.ppm), confirmado_en: fechaOk(j.oficial.confirmado_en) } : null;
-  const pj = j.preiva_enviado && typeof j.preiva_enviado === 'object' ? j.preiva_enviado
-    : (j.oficial?.fuente === 'preiva' ? { total: j.oficial.total, enviado_en: j.oficial.confirmado_en } : null);
+  // R4 · D6: el estado del IVA lo manda el servidor. Sin estado reconocible: 'publicado' solo con foto oficial; si no, 'estimado'
+  // (fail-closed: un monto provisional nunca se muestra como revisado ni como F29 presentado).
+  let estadoIva = of ? 'publicado' : (ESTADOS_IVA.has(j.estado_iva) && j.estado_iva !== 'publicado' ? j.estado_iva : 'estimado');
+  const rv = estadoIva === 'revisado' && j.revisado && typeof j.revisado === 'object' && pesos(j.revisado.total) !== null ? j.revisado : null;
+  const pj = estadoIva !== 'revisado' ? null : rv ? { total: rv.total, enviado_en: rv.validado_en }
+    : (j.preiva_enviado && typeof j.preiva_enviado === 'object' ? j.preiva_enviado : null);
   const preiva = !of && pj && pesos(pj.total) !== null ? { total: pesos(pj.total), enviado_en: fechaOk(pj.enviado_en) } : null;
+  if (estadoIva === 'revisado' && !preiva) estadoIva = 'estimado';   // «revisado» sin monto revisado: no se afirma
   const vence = fechaOk(j.vence);
-  if (j.conexion?.estado !== 'conectado') return { estado: 'no_conectado', periodo, vence, oficial: of, preiva };
+  if (j.conexion?.estado !== 'conectado') return { estado: 'no_conectado', periodo, vence, oficial: of, preiva, estado_iva: estadoIva };
   const e = j.estimacion && typeof j.estimacion === 'object' ? j.estimacion : {};
   const cp = e.compras_pendientes && typeof e.compras_pendientes === 'object' ? e.compras_pendientes : null;
   const rem = e.remanente && typeof e.remanente === 'object' && pesos(e.remanente.monto) !== null
@@ -287,7 +298,7 @@ export function normalizarImpuestos(j) {
                    codigo: texto(x.codigo, 20), texto: texto(x.texto, 200) }));
   return {
     estado: 'ok', periodo, vence, datos_al: fechaOk(j.datos_al), cobertura_completa: j.cobertura_completa === true,
-    est, oficial: of, preiva, f29, obs: { items, cartas: normalizarCartas(j.observaciones?.cartas), cumplimiento: normalizarCumplimiento(j.observaciones?.cumplimiento) },
+    est, oficial: of, preiva, estado_iva: estadoIva, f29, obs: { items, cartas: normalizarCartas(j.observaciones?.cartas), cumplimiento: normalizarCumplimiento(j.observaciones?.cumplimiento) },
   };
 }
 
@@ -459,7 +470,7 @@ export function normalizarAvisos(j, perm) {
 // Contrato (gestoor-backend, 202611211800_reporte_auto_c_micontadoor.sql): mc.mi_reporte(p_ref, p_periodo?) →
 //   { ok, ref, seccion:{ disponible:false } | { disponible:true, datos:{ periodo:'AAAA-MM', version, enviado_at, validado:true, estado, pagado,
 //       impuestos_estado, obligaciones:[{id, concepto, periodo, monto, vence|null, estado}], calculo:[{t, xs?, monto?|texto?, resta?, info?}],
-//       total_f29, rrhh:{estado:'listo'|'pendiente'|'no_aplica'}, servicios:{folio, monto, estado:'emitida'}|null,
+//       total_f29, rrhh:{estado:'listo'|'pendiente'|'no_aplica'|'verificando'}, servicios:{folio, monto, estado:'emitida'}|null,
 //       avisos:[{codigo:'F29_DECLARADO'|'F29_SIN_DECLARAR'|'F29_OBSERVADO'|'F29_EN_REVISION', periodos}
 //               | {codigo:'F29_ESTADO_SIN_VERIFICAR', periodos} | {codigo:'SII_OBSERVACIONES', cartas, cumple, f22} | {codigo:'IU_PENDIENTE_RRHH'}],
 //       historial:[{periodo, enviado_at, f29}],
@@ -474,6 +485,8 @@ const PER_GUION = /^(20\d{2})-(0[1-9]|1[0-2])$/;
 /** Respuesta de mc.mi_reporte → sección 'reporte' que leen las pantallas. Fail-closed: lo que no se entiende, no se muestra. */
 export function normalizarReporte(j) {
   const sec = j && j.ok === true ? j.seccion : null;
+  // R4 · D6: reabierto por el Master y aún no publicado de nuevo → «Información en revisión» (sin montos).
+  if (sec && sec.disponible === false && sec.estado === 'en_revision' && PER_GUION.test(String(sec.periodo))) return { disponible: false, en_revision: true, periodo: sec.periodo };
   if (!sec || sec.disponible !== true || !sec.datos || typeof sec.datos !== 'object') return { disponible: false };
   const d = sec.datos;
   if (!PER_GUION.test(String(d.periodo)) || d.validado !== true) return { disponible: false };
@@ -496,7 +509,8 @@ export function normalizarReporte(j) {
     .filter((a) => a.codigo === 'SII_OBSERVACIONES' ? (a.cartas > 0 || a.cumple === false || a.f22 > 0) : a.codigo === 'IU_PENDIENTE_RRHH' || a.periodos.length > 0);
   const historial = (Array.isArray(d.historial) ? d.historial : []).filter((h) => h && PER_GUION.test(String(h.periodo))).slice(0, 12)
     .map((h) => ({ periodo: h.periodo, enviado_at: fechaOk(h.enviado_at), f29: pesos(h.f29) }));
-  const rr = ['listo', 'pendiente', 'no_aplica'].includes(d.rrhh?.estado) ? d.rrhh.estado : 'pendiente';
+  // R4 · D5: 'verificando' = «sin trabajadores» lo confirmó quien cerró (no RR. HH.): «Estamos verificando la información de este período».
+  const rr = ['listo', 'pendiente', 'no_aplica', 'verificando'].includes(d.rrhh?.estado) ? d.rrhh.estado : 'pendiente';
   // AUTO-C01: la situación ACTUAL del F29 de ese período (calculada al consultar) va aparte de la foto. Lista blanca de campos.
   const sa = d.situacion_actual && typeof d.situacion_actual === 'object' && ESTADOS_F29.has(d.situacion_actual.f29_estado) && PER_GUION.test(String(d.situacion_actual.periodo))
     ? { consultado_en: fechaOk(d.situacion_actual.consultado_en), periodo: d.situacion_actual.periodo, f29_estado: d.situacion_actual.f29_estado, f29_vence: fechaOk(d.situacion_actual.f29_vence) } : null;

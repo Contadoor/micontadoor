@@ -119,3 +119,18 @@ test('R3 · reporte validado en Contable de una empresa sin SII: «Validado por 
   assert.ok(!s.includes('Según el SII al cierre') && !s.includes('Hoy en el SII'));
   assert.ok(!/Pre-IVA|pasar al reporte/i.test(s), 'el reporte cerrado no habla del Pre-IVA');
 });
+
+test('R4 · D6/D5: reporte reabierto → «Información en revisión» sin montos; RR. HH. confirmado al cerrar → «Estamos verificando…»', async () => {
+  const { normalizarReporte } = await import('../js/datos.js');
+  const er = normalizarReporte({ ok: true, seccion: { disponible: false, estado: 'en_revision', periodo: '2026-10' } });
+  assert.deepEqual(er, { disponible: false, en_revision: true, periodo: '2026-10' });
+  assert.deepEqual(normalizarReporte({ ok: true, seccion: { disponible: false, estado: 'en_revision', periodo: 'x' } }), { disponible: false });
+  const { vReporte } = await import('../js/vistas-reporte.js');
+  const s = String(vReporte({ resumen: { secciones: { reporte: er } }, perm: {}, enlaceDoc: () => null }));
+  assert.ok(s.includes('Información en revisión') && s.includes('octubre') && !/\$\d/.test(s));
+  const j = { ok: true, seccion: { disponible: true, datos: { periodo: '2026-10', validado: true, enviado_at: '2026-11-14T15:30:00Z', obligaciones: [], calculo: [], total_f29: 10000, rrhh: { estado: 'verificando' }, avisos: [], historial: [] } } };
+  const n = normalizarReporte(j);
+  assert.equal(n.datos.rrhh, 'verificando');
+  const v = String(vReporte({ resumen: { secciones: { reporte: n } }, perm: {}, enlaceDoc: () => null }));
+  assert.ok(v.includes('Estamos verificando la información de este período'));
+});
