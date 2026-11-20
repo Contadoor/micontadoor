@@ -2,7 +2,7 @@
 // Diseño: maqueta aprobada por Luciano el 19-11-2026 (descargas/f2b_preiva_cartapra/maqueta_micontadoor.html). Todo escapado con html``.
 import { html, clp, fecha, hora, mesDe, periodoTitulo, MESES, parsePeriodo } from './util.js';
 import { I } from './iconos.js';
-import { recomendacionesImpuestos, totalMostrado, validado } from './datos.js';
+import { recomendacionesImpuestos, totalMostrado, validado, TEXTO_ESTADO_IVA } from './datos.js';
 import { sub, teaser, vacio } from './vistas-comunes.js';
 
 const ESTADO_F29 = {
@@ -14,6 +14,9 @@ const ESTADO_F29 = {
 // Luciano 19-11: dos estados del monto principal. Antes de cerrar el reporte: «Pre-IVA de <mes>» · «Estimado con datos del SII».
 // Con el reporte del período cerrado/enviado: «IVA de <mes>» · «Validado por Contadoor». El F29 del SII es solo informativo (estado del F29).
 export const ETIQUETA = { estimado: 'Estimado con datos del SII', validado: 'Validado por Contadoor' };
+// R4 (dictamen R3 · D6): cuatro estados del IVA del período, decididos por el servidor (mc.mis_impuestos.estado_iva).
+const estadoDe = (n) => (validado(n) ? 'publicado' : (TEXTO_ESTADO_IVA[n?.estado_iva] ? n.estado_iva : 'estimado'));
+const CHIP_IVA = { estimado: 'c-proy', revisado: 'c-rev', publicado: 'c-ok-d', en_revision: 'c-pend' };
 const tituloDe = (n) => (n?.periodo ? (validado(n) ? 'IVA de ' : 'Pre-IVA de ') + mesDe(n.periodo) : 'Pre-IVA del mes');
 const mesSig = (p) => { const x = parsePeriodo(p); return x ? MESES[x.mes % 12] : ''; };
 const pct = (t) => (t === null || t === undefined ? '' : String(t).replace('.', ','));
@@ -116,7 +119,10 @@ function observaciones(n) {
 /** Pantalla «Tu IVA del mes». n = normalizarImpuestos(respuesta) | null (RPC no configurada) | {estado:'error'}. */
 export function vImpuestos(ctx, n) {
   const titulo = tituloDe(n);
-  const chipEstado = (v) => html`<span class="chip ${v ? 'c-ok-d' : 'c-proy'}">${v ? ETIQUETA.validado : ETIQUETA.estimado}</span>`;
+  const est = estadoDe(n);
+  // Estimado: «IVA estimado · Estimado con datos del SII»; revisado / en revisión con su texto; publicado: «Validado por Contadoor».
+  const chipEstado = (v) => html`<span class="chip ${CHIP_IVA[est]}">${v ? ETIQUETA.validado : est === 'estimado' ? ETIQUETA.estimado : TEXTO_ESTADO_IVA[est]}</span>`;
+  const lineaEstado = html`<div class="xs mt8" data-estado-iva="${est}"><b>${TEXTO_ESTADO_IVA[est]}</b>${est === 'revisado' ? ' · el monto definitivo es el del reporte mensual publicado' : est === 'en_revision' ? ' · tu equipo Contadoor está revisando nuevamente este período' : ''}</div>`;
   let cuerpo;
   if (n?.estado === 'bloqueada') {   // solo si el servidor aún bloquea por plan (antes de MC-IMP-1b)
     cuerpo = teaser('Pre-IVA del mes', [['IVA estimado del mes', '$•••.•••'], ['Crédito del mes', '$••.•••']], ['Tu IVA calculado con tus datos del SII', 'Recomendaciones para pagar menos y sin atrasos', 'Observaciones del SII a tiempo'], ctx.waMejora);
@@ -124,18 +130,18 @@ export function vImpuestos(ctx, n) {
     cuerpo = vacio(I.calendario, 'No pudimos cargar tu IVA del mes', 'Vuelve a intentarlo en unos minutos. Si sigue igual, escríbenos.');
   } else if (n.estado === 'no_conectado') {
     const t = totalMostrado(n);
-    cuerpo = html`${t !== null ? html`<div class="card osc"><div class="hd"><h2>${validado(n) ? 'Tu F29 de ' : 'Tu IVA estimado de '}${mesDe(n.periodo)}</h2>${chipEstado(validado(n))}</div><div class="big">${clp(t)}</div>${n.vence ? html`<div class="sm">Se declara y paga hasta el <b class="claro">${fecha(n.vence, { anio: true })}</b></div>` : ''}</div>` : ''}
+    cuerpo = html`${t !== null ? html`<div class="card osc"><div class="hd"><h2>${validado(n) ? 'Tu F29 de ' : 'Tu IVA estimado de '}${mesDe(n.periodo)}</h2>${chipEstado(validado(n))}</div><div class="big">${clp(t)}</div>${n.vence ? html`<div class="sm">Se declara y paga hasta el <b class="claro">${fecha(n.vence, { anio: true })}</b></div>` : ''}${lineaEstado}</div>` : ''}
       ${vacio(I.calendario, 'Tu empresa aún no está conectada al SII', 'Cuando tu equipo Contadoor la conecte, aquí verás tu IVA del mes calculado con tus datos del SII, todos los días.')}`;
   } else {
     const e = n.est; const total = totalMostrado(n); const v = validado(n);
-    const detalle = v ? (n.oficial.confirmado_en ? `Tu analista cerró tu reporte el ${fecha(n.oficial.confirmado_en, { anio: true })}` : 'Según tu reporte del mes')
-      : n.preiva ? `Revisado por tu analista${n.preiva.enviado_en ? ' el ' + fecha(n.preiva.enviado_en, { anio: true }) : ''}; puede cambiar hasta el cierre del reporte`
+    const detalle = v ? (n.oficial.confirmado_en ? `Reporte mensual publicado el ${fecha(n.oficial.confirmado_en, { anio: true })}` : 'Según tu reporte del mes')
+      : n.preiva ? `Revisado por tu analista${n.preiva.enviado_en ? ' el ' + fecha(n.preiva.enviado_en, { anio: true }) : ''}; puede cambiar hasta que se publique el reporte`
         : (e.iva_pagar !== null && e.ppm !== null ? `IVA ${clp(e.iva_pagar)} + PPM ${clp(e.ppm)}` : 'Falta un dato para el total: lo confirma tu analista');
     cuerpo = html`<div class="card osc"><div class="hd"><h2>${v ? 'IVA a pagar en ' : 'IVA estimado a pagar en '}${mesSig(n.periodo)}</h2>${chipEstado(v)}</div>
         <div class="big">${total === null ? 'Por confirmar' : clp(total)}</div>
         <div class="sm">${detalle}${n.vence ? html` · se declara y paga hasta el <b class="claro">${fecha(n.vence, { anio: true })}</b>` : ''}</div>
         ${n.datos_al ? html`<div class="act"><i></i>Datos del SII actualizados al ${fecha(n.datos_al, { anio: true })}, ${hora(n.datos_al)}</div>` : ''}
-        ${!n.cobertura_completa ? html`<div class="xs mt8">Algunos documentos del mes aún se están leyendo del SII.</div>` : ''}</div>
+        ${!n.cobertura_completa ? html`<div class="xs mt8">Algunos documentos del mes aún se están leyendo del SII.</div>` : ''}${lineaEstado}</div>
       <div class="kpis mb">
         <div class="card kpi"><small>Ventas del mes</small><b>${clp(e.ventas_neto !== null ? e.ventas_neto + (e.ventas_exento || 0) : null)}</b><span class="xs">${e.ventas_documentos !== null ? e.ventas_documentos + ' documentos · ' : ''}IVA ${clp(e.debito)}</span></div>
         <div class="card kpi"><small>Compras del mes</small><b>${clp(e.compras_neto !== null ? e.compras_neto + (e.compras_exento || 0) : null)}</b><span class="xs">${e.compras_documentos !== null ? e.compras_documentos + ' documentos · ' : ''}IVA ${clp(e.credito)}</span></div>
