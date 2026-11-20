@@ -118,3 +118,11 @@ test('SII-OBS-2: cartas y cumplimiento con lista blanca, fail-closed y escapados
   assert.ok(hn.includes('Hay condiciones por regularizar') && hn.includes('Condición pendiente (ejemplo)') && !hn.includes('>Otra<') && hn.includes('Requiere atención'));
   assert.equal(normalizarImpuestos({ ...base(), observaciones: { items: [], cumplimiento: { disponible: true, cumple: 'si' } } }).obs.cumplimiento.disponible, false, 'cumple no booleano = no se muestra');
 });
+// ── R2 (AUTO-C02/C03): estados nuevos del F29 en «Tu IVA del mes» ──
+test('R2 · normalizarImpuestos acepta sin_verificar y no_encontrado (distintos de no_declarado) y descarta estados desconocidos', () => {
+  const j = base();
+  j.f29 = [{ periodo: '202610', estado: 'por_declarar', vence: '2026-11-20' }, { periodo: '202609', estado: 'no_encontrado', vence: '2026-10-20' },
+           { periodo: '202608', estado: 'sin_verificar', vence: '2026-09-22' }, { periodo: '202607', estado: 'inventado', vence: '2026-08-20' }];
+  const n = normalizarImpuestos(j);
+  assert.deepEqual(n.f29.map((x) => x.estado), ['por_declarar', 'no_encontrado', 'sin_verificar']);
+});

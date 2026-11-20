@@ -8,6 +8,8 @@ import { sub, teaser, vacio } from './vistas-comunes.js';
 const ESTADO_F29 = {
   declarado: ['c-ok', 'Declarado en el SII ✓'], en_revision: ['c-rev', 'En revisión del SII'], observado: ['c-venc', 'Con observación'],
   no_declarado: ['c-venc', 'No declarado'], por_declarar: ['c-pend', 'Por declarar'], sin_dato: ['c-gris', 'Sin dato'],
+  // R2 (AUTO-C02/C03): estados distintos de «no declarado».
+  sin_verificar: ['c-gris', 'Declarado · por verificar'], no_encontrado: ['c-gris', 'Verificando en el SII'],
 };
 // Luciano 19-11: dos estados del monto principal. Antes de cerrar el reporte: «Pre-IVA de <mes>» · «Estimado con datos del SII».
 // Con el reporte del período cerrado/enviado: «IVA de <mes>» · «Validado por Contadoor». El F29 del SII es solo informativo (estado del F29).

@@ -19,6 +19,9 @@ export const CONFIG = Object.freeze({
     // MC-IMP-1 «Tu IVA del mes» (mc.mis_impuestos). Publicar el portal DESPUÉS de instalar la migración 202611191200.
     // Si hubiera que publicar antes, dejarlo en null: la pantalla vuelve al Pre-IVA de siempre («aún no publicado»).
     IMPUESTOS: 'mis_impuestos',
+    // REPORTE-AUTO C: el reporte mensual CERRADO (mc.mi_reporte). Publicar el portal DESPUÉS de instalar la migración 202611211800.
+    // Si hubiera que publicar antes, dejarlo en null: la pantalla Reporte sigue con «Tu reporte aún no está publicado».
+    REPORTE: 'mi_reporte',
   }),
 
   // Hosts desde los que se aceptan enlaces de documentos (PDF firmados de Storage). Vacío = no se enlaza nada.

@@ -11,7 +11,7 @@
 //                       pago:{total,cuotas_total,pagado,pendiente,vencido,cuotas:[{n,monto,vence,estado,pagada_el}],factura} | {sin_permiso:true},
 //                       documentos:[{t,fecha,tipo}], documentos_retenidos }
 //   empresa_resumen sigue diciendo trabajos = {disponible:false}: la app reemplaza esa sección con normalizarTrabajos().
-import { UUID, pesos, parsePeriodo, comparaPeriodo, clp, fecha } from './util.js';
+import { UUID, pesos, parsePeriodo, comparaPeriodo, clp, fecha, periodoTitulo } from './util.js';
 
 export const SECCIONES = ['reporte', 'mi_cuenta', 'facturas', 'trabajos', 'pre_iva', 'pre_renta'];
 
@@ -233,7 +233,9 @@ export function conTrabajos(resumen, respuesta) {
 //     f29:[{periodo:'AAAAMM', estado, vence, total}], observaciones:{ items:[{tipo, periodo|anio_tributario, codigo, texto}],
 //       cartas:{disponible, total_12_meses?, items?:[{categoria:'carta'|'notificacion', titulo, fecha, remitente, plazo, nueva}]},   (SII-OBS-2)
 //       cumplimiento:{disponible, cumple?, estado?, actualizado_en?, condiciones?:[{titulo, cumple}]} } }                        (SII-OBS-2)
-const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'no_declarado', 'por_declarar', 'sin_dato']);
+// R2 (AUTO-C02/C03): 'sin_verificar' = declarado con una letra del SII fuera de la clasificación; 'no_encontrado' = no aparece en una
+// lectura hecha antes del vencimiento (se verifica; no es «no declarado»).
+const ESTADOS_F29 = new Set(['declarado', 'en_revision', 'observado', 'sin_verificar', 'no_declarado', 'no_encontrado', 'por_declarar', 'sin_dato']);
 const TIPOS_OBS = new Set(['f29_observado', 'f29_en_revision', 'f29_no_declarado', 'f22_observacion']);
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const AAAAMM = /^(20\d{2})(0[1-9]|1[0-2])$/;
@@ -353,4 +355,94 @@ export function recomendacionesImpuestos(n, hoy) {
       accion: `Ten disponibles ${clp(total)} antes del ${plazo}.`, quien: 'tu', plazo });
   }
   return out.sort((a, b) => b.impacto - a.impacto).slice(0, RECO.max);
+}
+
+// ── Reporte mensual cerrado (REPORTE-AUTO C) ──────────────────────────────────────────────────────────────────
+// Contrato (gestoor-backend, 202611211800_reporte_auto_c_micontadoor.sql): mc.mi_reporte(p_ref, p_periodo?) →
+//   { ok, ref, seccion:{ disponible:false } | { disponible:true, datos:{ periodo:'AAAA-MM', version, enviado_at, validado:true, estado, pagado,
+//       impuestos_estado, obligaciones:[{id, concepto, periodo, monto, vence|null, estado}], calculo:[{t, xs?, monto?|texto?, resta?, info?}],
+//       total_f29, rrhh:{estado:'listo'|'pendiente'|'no_aplica'}, servicios:{folio, monto, estado:'emitida'}|null,
+//       avisos:[{codigo:'F29_DECLARADO'|'F29_SIN_DECLARAR'|'F29_OBSERVADO'|'F29_EN_REVISION', periodos}
+//               | {codigo:'F29_ESTADO_SIN_VERIFICAR', periodos} | {codigo:'SII_OBSERVACIONES', cartas, cumple, f22} | {codigo:'IU_PENDIENTE_RRHH'}],
+//       historial:[{periodo, enviado_at, f29}],
+//       foto:{al_cierre:true, cerrado_at, version},                                    (R2 · AUTO-C01: todo lo anterior es la foto del cierre)
+//       situacion_actual:{consultado_en, periodo, f29_estado, f29_vence} } } }         (R2 · AUTO-C01: el F29 de ese período HOY en el SII)
+//   Es la FOTO que guardó el analista al cerrar: no cambia aunque después cambien los datos. Sin notas internas.
+//   Decisión de Luciano 19-11: el cliente ve TODO lo del SII (lo declarado, lo no declarado y lo observado).
+const AVISOS_REPORTE = new Set(['F29_DECLARADO', 'F29_SIN_DECLARAR', 'F29_OBSERVADO', 'F29_EN_REVISION', 'F29_ESTADO_SIN_VERIFICAR', 'SII_OBSERVACIONES', 'IU_PENDIENTE_RRHH']);
+const entero = (n) => (Number.isInteger(n) && n >= 0 && n <= 9999 ? n : 0);
+const ESTADOS_OBLIG = new Set(['por_pagar', 'pagada', 'atrasada', 'anulada']);
+const PER_GUION = /^(20\d{2})-(0[1-9]|1[0-2])$/;
+/** Respuesta de mc.mi_reporte → sección 'reporte' que leen las pantallas. Fail-closed: lo que no se entiende, no se muestra. */
+export function normalizarReporte(j) {
+  const sec = j && j.ok === true ? j.seccion : null;
+  if (!sec || sec.disponible !== true || !sec.datos || typeof sec.datos !== 'object') return { disponible: false };
+  const d = sec.datos;
+  if (!PER_GUION.test(String(d.periodo)) || d.validado !== true) return { disponible: false };
+  const obligaciones = (Array.isArray(d.obligaciones) ? d.obligaciones : [])
+    .filter((o) => o && texto(o.concepto, 80) && PER_GUION.test(String(o.periodo)) && pesos(o.monto) !== null && ESTADOS_OBLIG.has(o.estado)).slice(0, 10)
+    .map((o) => ({ id: String(o.id ?? '').slice(0, 40), concepto: texto(o.concepto, 80), periodo: o.periodo, monto: pesos(o.monto),
+                   vence: fechaOk(o.vence), estado: o.estado }));
+  const calculo = (Array.isArray(d.calculo) ? d.calculo : []).filter((p) => p && texto(p.t, 80)).slice(0, 12).map((p) => {
+    const x = { t: texto(p.t, 80) };
+    if (texto(p.xs, 120)) x.xs = texto(p.xs, 120);
+    if (typeof p.texto === 'string') x.texto = texto(p.texto, 40) || '—'; else x.monto = pesos(p.monto) ?? 0;
+    if (p.resta === true) x.resta = true;
+    return x;
+  });
+  const s = d.servicios && typeof d.servicios === 'object' && pesos(d.servicios.monto) !== null
+    ? { folio: texto(d.servicios.folio, 60) || '—', monto: pesos(d.servicios.monto), estado: d.servicios.estado === 'pagada' ? 'pagada' : 'emitida' } : null;
+  const avisos = (Array.isArray(d.avisos) ? d.avisos : []).filter((a) => a && AVISOS_REPORTE.has(a.codigo)).map((a) => (a.codigo === 'SII_OBSERVACIONES'
+    ? { codigo: a.codigo, cartas: entero(a.cartas), cumple: typeof a.cumple === 'boolean' ? a.cumple : null, f22: entero(a.f22) }
+    : { codigo: a.codigo, periodos: (Array.isArray(a.periodos) ? a.periodos : []).filter((p) => PER_GUION.test(String(p))).slice(0, 13) }))
+    .filter((a) => a.codigo === 'SII_OBSERVACIONES' ? (a.cartas > 0 || a.cumple === false || a.f22 > 0) : a.codigo === 'IU_PENDIENTE_RRHH' || a.periodos.length > 0);
+  const historial = (Array.isArray(d.historial) ? d.historial : []).filter((h) => h && PER_GUION.test(String(h.periodo))).slice(0, 12)
+    .map((h) => ({ periodo: h.periodo, enviado_at: fechaOk(h.enviado_at), f29: pesos(h.f29) }));
+  const rr = ['listo', 'pendiente', 'no_aplica'].includes(d.rrhh?.estado) ? d.rrhh.estado : 'pendiente';
+  // AUTO-C01: la situación ACTUAL del F29 de ese período (calculada al consultar) va aparte de la foto. Lista blanca de campos.
+  const sa = d.situacion_actual && typeof d.situacion_actual === 'object' && ESTADOS_F29.has(d.situacion_actual.f29_estado) && PER_GUION.test(String(d.situacion_actual.periodo))
+    ? { consultado_en: fechaOk(d.situacion_actual.consultado_en), periodo: d.situacion_actual.periodo, f29_estado: d.situacion_actual.f29_estado, f29_vence: fechaOk(d.situacion_actual.f29_vence) } : null;
+  // «Pagado» solo si TODAS las obligaciones del mes vienen marcadas pagadas (hoy el servidor las manda «por_pagar»: Conciliación las marcará).
+  const delMes = obligaciones.filter((o) => o.periodo === d.periodo && o.estado !== 'anulada');
+  const pagado = delMes.length > 0 && delMes.every((o) => o.estado === 'pagada');
+  return { disponible: true, datos: {
+    periodo: d.periodo, enviado_at: fechaOk(d.enviado_at), validado: true, estado: 'confirmado', pagado,
+    total_pagado_mes: pagado ? delMes.reduce((x, o) => x + o.monto, 0) : null,
+    obligaciones, calculo, total_f29: pesos(d.total_f29), servicios: s, avisos, historial, rrhh: rr,
+    cerrado_at: fechaOk(d.foto?.cerrado_at) || fechaOk(d.enviado_at), situacion_actual: sa,
+  } };
+}
+/** Copia del resumen con la sección 'reporte' tomada de mc.mi_reporte. Sin permiso: no se toca. Error: «aún no publicado» con aviso. */
+export function conReporte(resumen, respuesta) {
+  if (!resumen || typeof resumen !== 'object') return resumen;
+  const e = estadoSeccion(resumen.secciones?.reporte);
+  if (e === 'sin_permiso' || e === 'bloqueada') return resumen;
+  const sec = respuesta === 'error' ? { disponible: false, error: true } : normalizarReporte(respuesta);
+  const prev = resumen.secciones?.reporte?.datos;
+  if (sec.disponible && prev && Array.isArray(prev.novedades)) sec.datos.novedades = prev.novedades;   // novedades del resumen (demo / MC-6)
+  return { ...resumen, secciones: { ...(resumen.secciones || {}), reporte: sec } };
+}
+/** Situación ACTUAL del F29 del período (AUTO-C01/C03), en palabras para el cliente. */
+export function textoSituacionF29(e) {
+  return ({ declarado: 'Declarado en el SII ✓', observado: 'Con observación del SII', en_revision: 'En revisión del SII', sin_verificar: 'Declarado · estado del SII por verificar',
+            por_declarar: 'Por declarar (aún en plazo)', no_declarado: 'No declarado', no_encontrado: 'No lo encontramos en el SII: lo estamos verificando',
+            sin_dato: 'Aún sin dato del SII' })[e] || null;
+}
+/** Texto de un aviso del reporte para el cliente. */
+export function textoAvisoReporte(a) {
+  const meses = () => a.periodos.map((p) => periodoTitulo(p)).join(', ');
+  if (a?.codigo === 'F29_DECLARADO') return `F29 declarados en el SII: ${meses()}.`;
+  if (a?.codigo === 'F29_SIN_DECLARAR') return `Hay F29 sin declarar: ${meses()}. Tu equipo Contadoor te contactará para regularizarlos.`;
+  if (a?.codigo === 'F29_OBSERVADO') return `El SII observó el F29 de: ${meses()}. Tu equipo Contadoor lo está revisando.`;
+  if (a?.codigo === 'F29_EN_REVISION') return `F29 en revisión en el SII: ${meses()}.`;
+  if (a?.codigo === 'F29_ESTADO_SIN_VERIFICAR') return `F29 declarados con un estado del SII que tu equipo Contadoor está verificando: ${meses()}.`;
+  if (a?.codigo === 'SII_OBSERVACIONES') {
+    const p = [];
+    if (a.cartas > 0) p.push(a.cartas === 1 ? 'tienes 1 carta o notificación del SII en los últimos 12 meses' : `tienes ${a.cartas} cartas o notificaciones del SII en los últimos 12 meses`);
+    if (a.cumple === false) p.push('tu situación de cumplimiento tributario figura «no cumple»');
+    if (a.f22 > 0) p.push(a.f22 === 1 ? 'tu F22 tiene 1 observación' : `tu F22 tiene ${a.f22} observaciones`);
+    return p.length ? `Observaciones del SII: ${p.join('; ')}. El detalle está en «Tu IVA del mes».` : null;
+  }
+  if (a?.codigo === 'IU_PENDIENTE_RRHH') return 'El impuesto único de tus trabajadores se agrega cuando Remuneraciones quede lista.';
+  return null;
 }

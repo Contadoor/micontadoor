@@ -268,6 +268,24 @@ export const demo = {
     }
     return { ok: true, ref, seccion: { disponible: true, datos: d } };
   },
+  /** Igual que mc.mi_reporte (REPORTE-AUTO C): la FOTO del reporte cerrado; Nuestros servicios solo con ver_facturas; sin comentario interno.
+   *  Aromos muestra lo que el cliente ve del SII (decisión 19-11): F29 declarados, sin declarar y observaciones del SII. */
+  reporte(ref, opciones = {}) {
+    const e = EMPRESAS.find((x) => x.ref === ref);
+    if (!e) return null;
+    const r = clon(DATOS[ref].reporte || null);
+    if (!r) return { ok: true, ref, seccion: { disponible: false } };
+    const verFact = rolDe(e, opciones) === 'titular';
+    const datos = { periodo: r.periodo, version: 1, enviado_at: r.enviado_at, validado: true, estado: 'confirmado', pagado: false, impuestos_estado: 'ok',
+      obligaciones: r.obligaciones, calculo: r.calculo, total_f29: r.total_f29, rrhh: { estado: ref === REF.aromos ? 'no_aplica' : 'listo' },
+      servicios: verFact && r.servicios ? { folio: r.servicios.folio, monto: r.servicios.monto, estado: r.servicios.estado === 'pagada' ? 'pagada' : 'emitida' } : null,
+      avisos: ref === REF.aromos ? [{ codigo: 'F29_DECLARADO', periodos: ['2026-05', '2026-06', '2026-09'] }, { codigo: 'F29_SIN_DECLARAR', periodos: ['2026-07', '2026-08'] },
+                                    { codigo: 'SII_OBSERVACIONES', cartas: 1, cumple: false, f22: 0 }] : [],
+      historial: r.historial || [{ periodo: r.periodo, enviado_at: r.enviado_at, f29: r.total_f29 }],
+      foto: { al_cierre: true, cerrado_at: r.enviado_at, version: 1 },
+      situacion_actual: { consultado_en: new Date().toISOString(), periodo: r.periodo, f29_estado: ref === REF.aromos ? 'declarado' : 'por_declarar', f29_vence: null } };
+    return { ok: true, ref, seccion: { disponible: true, datos } };
+  },
   /** Igual que mc.mis_impuestos (MC-IMP-1 + 1b). Río: Pre-IVA estimado; Aromos (Cumplimiento): reporte validado; Alerce: aún no conectada. */
   impuestos(ref, opciones = {}) {
     const e = EMPRESAS.find((x) => x.ref === ref);
