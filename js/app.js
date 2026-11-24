@@ -2,16 +2,17 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos, normalizarImpuestos } from './datos.js';
-import { html, urlSegura, CORREO } from './util.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, normalizarImpuestos, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte } from './datos.js';
+import { html, urlSegura, CORREO, sha256Hex } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
 import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
 import { vImpuestos } from './vistas-impuestos.js';
+import { vTerminosServidor, vAyuda, vIncorporacion, hojaTerminos } from './vistas-apertura.js';
 import { registrarServiceWorker } from './push.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const RUTAS_ACCESO = new Set(['ingreso', 'recuperar', 'activar', 'terminos']);
 const $app = document.getElementById('app');
 const q = new URLSearchParams(location.search);
@@ -21,7 +22,10 @@ const st = {
   api: null, sesion: null, empresa: null, resumen: null, perm: null, impuestos: null, cargadoAt: 0,
   mensaje: null, flash: null, tipoEnlace: 'invite', activado: false, enlacePendiente: null,
   abiertos: new Set(), solicitudes: new Set(), hoja: null, rutaPrevia: '',
+  // MICONTADOOR-APERTURA: términos del servidor, incorporación, cargas por ruta (Mi acceso, Ayuda) y el formulario de soporte
+  terminosSrv: null, incorporacion: null, cache: {}, ayuda: {},
 };
+const ERR_CORTE = ['MC_SESION_INVALIDA', 'MC_BLOQUEADO'];
 
 // ── Tema: Claro / Oscuro / Automático (se recuerda en el aparato) ─────────────────────────────────────────────────
 const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -49,11 +53,13 @@ function ir(r) { const h = '#/' + r; if (location.hash === h) pintar(); else loc
 const wa = (num, texto) => `https://wa.me/${encodeURIComponent(num)}?text=${encodeURIComponent(texto)}`;
 const WA_MEJORA = wa(CONFIG.WHATSAPP_COMERCIAL, 'Hola Contadoor 👋 Quiero saber cómo mejorar mi plan a Contadoor PRO (Pre-IVA y Pre-Renta). Te escribo desde MiContadoor.');
 const WA_EQUIPO = wa(CONFIG.WHATSAPP_EQUIPO, 'Hola Contadoor 👋 Te escribo desde MiContadoor.');
+const WA_AYUDA = wa(CONFIG.WHATSAPP_EQUIPO, 'Hola Contadoor 👋 Necesito ayuda con MiContadoor.');   // sin datos personales ni montos
 
 function ctx() {
   return {
     cfg: CONFIG, api: st.api, sesion: st.sesion, empresa: st.empresa, resumen: st.resumen, perm: st.perm, impuestos: st.impuestos, tema, version: VERSION,
-    abiertos: st.abiertos, solicitudes: st.solicitudes, waMejora: WA_MEJORA, waEquipo: WA_EQUIPO,
+    abiertos: st.abiertos, solicitudes: st.solicitudes, waMejora: WA_MEJORA, waEquipo: WA_EQUIPO, waAyuda: WA_AYUDA,
+    incorporacion: st.incorporacion, misTerminos: st.cache.misTerminos,
     enlaceDoc: (u) => urlSegura(u, CONFIG.HOSTS_DOCUMENTOS),
   };
 }
@@ -71,6 +77,8 @@ function vista(r, a) {
     case 'trabajos': return vTrabajos(c);
     case 'mas': return vMas(c);
     case 'acceso': return vAcceso(c);
+    case 'ayuda': return vAyuda(c, { ...st.ayuda, soporte: !!st.api.capacidades.soporte, solicitudes: st.cache.solicitudes });
+    case 'incorporacion': return vIncorporacion(c, st.incorporacion);
     default: return vInicio(c);
   }
 }
@@ -85,7 +93,7 @@ function pintar() {
     const rr = RUTAS_ACCESO.has(r) ? r : 'ingreso';
     cuerpo = rr === 'recuperar' ? vRecuperar({ mensaje: st.mensaje })
       : rr === 'activar' ? vActivar({ tipo: st.tipoEnlace, mensaje: st.mensaje, listo: st.activado, pendiente: !!st.enlacePendiente })
-        : rr === 'terminos' ? vTerminos({ version: CONFIG.TERMINOS_VERSION, mensaje: st.mensaje })
+        : rr === 'terminos' ? (st.api?.capacidades?.terminosServidor ? vTerminosServidor({ srv: st.terminosSrv, mensaje: st.mensaje }) : vTerminos({ version: CONFIG.TERMINOS_VERSION, mensaje: st.mensaje }))
           : vIngreso({ mensaje: st.mensaje, demo: esDemo });
     colorBarra(rr);
   } else if (!st.empresa) {
@@ -101,6 +109,7 @@ function pintar() {
   $app.classList.toggle('sin-tabs', !conTabs);
   $app.innerHTML = String(html`${franja}${cuerpo}${conTabs ? tabs(ctx(), r) : ''}${hoja}`);
   hidratar();
+  asegurarRuta(RUTAS_ACCESO.has(r) || !st.sesion ? (RUTAS_ACCESO.has(r) ? r : 'ingreso') : r);
   const clave = r + '/' + a;
   if (clave !== st.rutaPrevia) { window.scrollTo(0, 0); st.rutaPrevia = clave; }
 }
@@ -118,12 +127,50 @@ function hidratar() {
   const f = $app.querySelector('.hoja button, .hoja input'); if (f) f.focus();
 }
 
+// ── MICONTADOOR-APERTURA: cargas que dependen de la ruta ───────────────────────────────────────────────────────────
+/** Carga una sola vez por clave; errores de sesión cortan todo como en el resto de la app; otros errores → 'error'. */
+function cargarUna(clave, fn) {
+  if (st.cache[clave] !== undefined) return;
+  st.cache[clave] = 'cargando';
+  fn().then((v) => { st.cache[clave] = v ?? 'error'; pintar(); })
+    .catch((e) => { if (ERR_CORTE.includes(e?.codigo)) { manejarError(e); return; } st.cache[clave] = 'error'; pintar(); });
+}
+function asegurarRuta(r) {
+  if (r === 'terminos' && st.api?.capacidades?.terminosServidor && !st.terminosSrv) { cargarTerminos().then(pintar).catch(manejarError); return; }
+  if (!st.sesion || !st.empresa) return;
+  if (r === 'acceso' && st.api.capacidades.misTerminos) cargarUna('misTerminos', async () => normalizarMisTerminos(await st.api.misTerminos()));
+  if (r === 'ayuda' && st.api.capacidades.soporte) cargarUna('solicitudes', async () => normalizarSolicitudes(await st.api.misSolicitudes(st.empresa.ref)));
+}
+/** Términos del servidor: se muestran SOLO si el SHA-256 del texto calza con el que informa el servidor (fail-closed). */
+async function cargarTerminos() {
+  st.terminosSrv = { estado: 'cargando' };
+  try {
+    const t = normalizarTerminos(await st.api.terminosVigentes());
+    if (!t) { st.terminosSrv = { estado: 'error' }; return; }
+    if (await sha256Hex(t.texto) !== t.sha256) { st.terminosSrv = { estado: 'error', texto: mensajeError('TERMINOS_HUELLA') }; return; }
+    st.terminosSrv = { estado: 'ok', ...t };
+  } catch (e) {
+    if (ERR_CORTE.includes(e?.codigo)) { st.terminosSrv = null; throw e; }
+    st.terminosSrv = { estado: 'error' };
+  }
+}
+/** Texto exacto de una versión aceptada (Mi acceso → «Ver texto»), también verificado con su huella. */
+async function verTerminos(version) {
+  let t = { estado: 'cargando' }; st.hoja = () => hojaTerminos(t); pintar();
+  try {
+    const n = normalizarTerminos(await st.api.terminosTexto(version));
+    t = n && (await sha256Hex(n.texto)) === n.sha256 && n.version === version ? { estado: 'ok', ...n } : { estado: 'error' };
+  } catch (e) { if (ERR_CORTE.includes(e?.codigo)) { st.hoja = null; await manejarError(e); return; } t = { estado: 'error' }; }
+  if (st.hoja) { st.hoja = () => hojaTerminos(t); pintar(); }
+}
+function limpiarApertura() { st.terminosSrv = null; st.incorporacion = null; st.cache = {}; st.ayuda = {}; }
+
 // ── Datos ─────────────────────────────────────────────────────────────────────────────────────────────────────
 async function manejarError(e) {
   const cod = e?.codigo || 'MC_ERROR';
   if (cod === 'MC_SESION_INVALIDA' || cod === 'MC_BLOQUEADO') {
     await st.api.salir().catch(() => {});
-    st.sesion = null; st.empresa = null; st.resumen = null;
+    st.sesion = null; st.empresa = null; st.resumen = null; limpiarApertura();
     st.mensaje = { texto: mensajeError(cod) }; ir('ingreso'); return;
   }
   st.flash = null; st.mensaje = { texto: mensajeError(cod) };
@@ -135,7 +182,11 @@ async function cargar(destino) {
   $app.innerHTML = '<div class="cargando" role="status" aria-label="Cargando"><div class="spin"></div></div>';
   try {
     st.sesion = await st.api.sesion();
-    if (st.sesion.cuenta.terminos_pendientes) { st.mensaje = null; ir('terminos'); return; }
+    if (st.sesion.cuenta.terminos_pendientes) {
+      st.mensaje = null;
+      if (st.api.capacidades.terminosServidor) await cargarTerminos();
+      ir('terminos'); return;
+    }
     const forzada = esDemo && /^[1-9]$/.test(q.get('empresa') || '') ? st.sesion.empresas[Number(q.get('empresa')) - 1]?.ref : null;
     const guardada = leer('mc_empresa');
     st.empresa = st.sesion.empresas.find((x) => x.ref === forzada) || st.sesion.empresas.find((x) => x.ref === guardada) || st.sesion.empresas[0] || null;
@@ -163,6 +214,14 @@ async function cargarResumen() {
     catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; imp = { estado: 'error' }; }
   }
   st.impuestos = imp;
+  // MICONTADOOR-APERTURA «Tu incorporación» (mc.mi_incorporacion): si falla, aviso neutro en su vista; nunca pasos inventados.
+  let inc = null;
+  if (st.api.capacidades.incorporacion && st.api.incorporacion) {
+    try { const j = await st.api.incorporacion(st.empresa.ref); inc = j ? normalizarIncorporacion(j) : null; }
+    catch (e) { if (ERR_CORTE.includes(e?.codigo)) throw e; inc = { estado: 'error' }; }
+  }
+  st.incorporacion = inc;
+  delete st.cache.solicitudes; st.ayuda = {};
   st.resumen = r;
   st.perm = permisos(st.resumen);
   st.cargadoAt = Date.now();
@@ -193,6 +252,12 @@ document.addEventListener('click', async (ev) => {
     const tipo = a.dataset.tipo === 'pague' ? 'pague' : 'transferi';
     st.hoja = () => hojaSolicitud(ctx(), tipo, item, st.mensajeHoja); st.mensajeHoja = null; pintar(); return;
   }
+  if (acc === 'terminos-reintentar') { st.terminosSrv = null; pintar(); return; }
+  if (acc === 'ver-terminos') { await verTerminos(a.dataset.version); return; }
+  if (acc === 'soporte-seguridad') {
+    st.ayuda = { tipo: 'seguridad' }; pintar();
+    document.getElementById('cuentanos')?.scrollIntoView({ block: 'start' }); document.querySelector('#cuentanos textarea')?.focus(); return;
+  }
   if (acc === 'cambiar-clave') {
     await st.api.recuperar(st.sesion.cuenta.correo).catch(() => {});
     st.flash = 'Te enviamos un enlace a tu correo para crear una contraseña nueva.'; pintar(); return;
@@ -200,7 +265,7 @@ document.addEventListener('click', async (ev) => {
   if (acc === 'salir' || acc === 'salir-todos') {
     if (acc === 'salir-todos' && !window.confirm('¿Cerrar tu sesión en todos tus aparatos? Tendrás que volver a ingresar en cada uno.')) return;
     await st.api.salir({ todos: acc === 'salir-todos' });
-    st.sesion = null; st.empresa = null; st.resumen = null; st.perm = null; st.hoja = null;
+    st.sesion = null; st.empresa = null; st.resumen = null; st.perm = null; st.hoja = null; limpiarApertura();
     st.mensaje = { ok: true, texto: 'Cerraste tu sesión.' }; ir('ingreso');
   }
 });
@@ -233,8 +298,33 @@ document.addEventListener('submit', async (ev) => {
       }
       case 'terminos': {
         if (!d.get('ok')) { st.mensaje = { texto: 'Para continuar, marca que aceptas los términos.' }; pintar(); return; }
-        await st.api.aceptarTerminos(CONFIG.TERMINOS_VERSION);
+        if (st.api.capacidades.terminosServidor) {
+          // Solo se acepta un texto VERIFICADO (huella calzada al cargar); el servidor vuelve a exigir versión + huella vigentes.
+          const t = st.terminosSrv;
+          if (t?.estado !== 'ok') { st.terminosSrv = null; st.mensaje = { texto: mensajeError('TERMINOS_HUELLA') }; pintar(); return; }
+          try { await st.api.aceptarTerminosV2(t.version, t.sha256); }
+          catch (e) {
+            if (e?.codigo === 'MC_TERMINOS_VERSION') { st.terminosSrv = null; st.mensaje = { texto: mensajeError('MC_TERMINOS_VERSION') }; pintar(); return; }
+            throw e;
+          }
+        } else {
+          await st.api.aceptarTerminos(CONFIG.TERMINOS_VERSION);
+        }
+        st.terminosSrv = null; delete st.cache.misTerminos;
         await cargar('inicio'); return;
+      }
+      case 'soporte': {
+        const tipo = String(d.get('tipo') || ''); const texto = String(d.get('mensaje') || '');
+        const err = validarSoporte(tipo, texto);
+        if (err) { st.ayuda = { tipo, texto, mensaje: err }; pintar(); return; }
+        try {
+          const r = await st.api.soporteCrear(st.empresa.ref, tipo, texto);
+          st.ayuda = { enviada: true, folio: /^MC-\d{4}-\d{1,8}$/.test(String(r?.folio)) ? r.folio : null };
+        } catch (e) {
+          if (ERR_CORTE.includes(e?.codigo)) throw e;
+          st.ayuda = { tipo, texto, mensaje: mensajeError(e?.codigo) }; pintar(); return;
+        }
+        delete st.cache.solicitudes; pintar(); return;
       }
       case 'solicitud': {
         const err = validarSolicitud(f.dataset.tipo, String(d.get('fecha') || ''), d.get('archivo'));
@@ -311,7 +401,7 @@ async function continuarEnlace() {
 async function arrancar() {
   aplicarTema((esDemo && q.get('tema')) || leer('mc_tema') || 'auto', !(esDemo && q.get('tema')));
   st.api = esDemo
-    ? crearApiDemo(demo, { plan: q.get('plan'), rol: q.get('rol'), solicitudes: q.get('solicitudes') === '1', terminos: q.get('terminos') === '1' })
+    ? crearApiDemo(demo, { plan: q.get('plan'), rol: q.get('rol'), solicitudes: q.get('solicitudes') === '1', terminos: q.get('terminos') === '1', inc: q.get('inc'), huella: q.get('huella') })
     : crearApiReal(CONFIG);
   registrarServiceWorker();
   if (!st.api) {

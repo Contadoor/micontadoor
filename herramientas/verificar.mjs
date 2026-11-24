@@ -58,7 +58,7 @@ for (const p of texto) {
   if (rel.startsWith('herramientas/verificar.mjs')) continue;
   if (/Laguna del Inca/i.test(s)) problemas.push(`${rel}: contiene una dirección personal`);
 }
-const ruts = (readFileSync(join(RAIZ, 'js/demo.js'), 'utf8').match(/\d{1,2}\.\d{3}\.\d{3}-[\dkK]/g) || []).filter((r) => !/^76\.000\.00\d-/.test(r));
+const ruts = (readFileSync(join(RAIZ, 'js/demo.js'), 'utf8').match(/\d{1,2}\.\d{3}\.\d{3}-[\dkK]/g) || []).filter((r) => !/^76\.000\.00\d-/.test(r) && r !== '77.166.269-2');   // 77.166.269-2 = RUT público de Contadoor (términos)
 if (ruts.length) problemas.push(`demo.js: RUT que no son ficticios: ${ruts.join(', ')}`);
 
 // 4. Avisos de publicación

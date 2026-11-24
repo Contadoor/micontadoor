@@ -325,3 +325,15 @@ a.btn{color:#fff}
 .reco p{margin:5px 0 0;font-size:13px;color:var(--t2)}
 .reco p b{color:var(--tinta);font-weight:600}
 .reco .reco-pie{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+/* MICONTADOOR-APERTURA: Ayuda (formulario), incorporación, diagnóstico, términos en hoja clara */
+.campos label{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-weight:600;color:var(--t2)}
+.campos select,.campos textarea{width:100%;font:16px Inter,sans-serif;padding:10px 12px;border-radius:12px;border:1px solid #D9C3DC;background:var(--fondo);color:var(--tinta)}
+.campos textarea{resize:vertical;min-height:110px}
+[data-tema="oscuro"] .campos select,[data-tema="oscuro"] .campos textarea{border-color:#4a2a52}
+.pasos-seg{margin:6px 0 4px;padding-left:20px}.pasos-seg li{margin:3px 0}
+.inc-card .prog{margin-top:4px}
+.diag .li{border-top:0;padding-top:4px}
+.terminos.claro{background:var(--fondo);border-color:var(--borde);color:var(--tinta)}
+.terminos.claro h2{color:var(--m-osc)}
+.verif{color:var(--dim);letter-spacing:.02em}
+.cargando.chico{min-height:80px}
