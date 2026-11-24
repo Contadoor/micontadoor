@@ -142,6 +142,10 @@ export function mensajeError(codigo) {
     case 'ENLACE': return 'El enlace ya no es válido o venció. Pide uno nuevo a tu equipo Contadoor o usa "¿Olvidaste tu contraseña?".';
     case 'RED': return 'No hay conexión. Revisa tu internet e inténtalo de nuevo.';
     case 'CONFIG': return 'MiContadoor estará disponible muy pronto. Te avisaremos cuando tu cuenta esté lista.';
+    case 'MC_TERMINOS_VERSION': return 'Los términos se actualizaron mientras los leías. Revisa la versión nueva y vuelve a aceptar.';
+    case 'MC_LIMITE': return 'Ya nos enviaste varias solicitudes hoy. Si es urgente, escríbenos por WhatsApp.';
+    case 'MC_DATOS': return 'Revisa los datos e inténtalo de nuevo.';
+    case 'TERMINOS_HUELLA': return 'No pudimos comprobar el texto de los términos. Por seguridad no se pueden aceptar ahora; inténtalo de nuevo en unos minutos.';
     default: return 'Algo no salió bien. Inténtalo de nuevo en unos minutos.';
   }
 }
@@ -353,4 +357,76 @@ export function recomendacionesImpuestos(n, hoy) {
       accion: `Ten disponibles ${clp(total)} antes del ${plazo}.`, quien: 'tu', plazo });
   }
   return out.sort((a, b) => b.impacto - a.impacto).slice(0, RECO.max);
+}
+
+// ── MICONTADOOR-APERTURA (24-11): términos versionados, soporte e incorporación ──────────────────────────────────────
+// Contrato: descargas/micontadoor_apertura/CONTRATO_DATOS.md (sección B).
+const FECHA_V = /^\d{4}-\d{2}-\d{2}$/;
+const HEX64 = /^[0-9a-f]{64}$/;
+
+/** mc.terminos_vigentes / mc.terminos_texto → {version, titulo, texto, sha256} o null (fail-closed). */
+export function normalizarTerminos(j) {
+  if (!j || j.ok !== true) return null;
+  if (!FECHA_V.test(String(j.version ?? '')) || typeof j.texto !== 'string' || !j.texto.trim() || j.texto.length > 60000) return null;
+  if (!HEX64.test(String(j.sha256 ?? ''))) return null;
+  return { version: j.version, titulo: String(j.titulo ?? 'Términos de uso y aviso de privacidad de MiContadoor').slice(0, 160), texto: j.texto, sha256: j.sha256 };
+}
+
+/** Texto de los términos en bloques: párrafos separados por línea en blanco; «## » al inicio = subtítulo. */
+export function bloquesTerminos(texto) {
+  return String(texto ?? '').replace(/\r\n?/g, '\n').split(/\n{2,}/).map((x) => x.trim()).filter(Boolean)
+    .map((x) => (x.startsWith('## ') ? { tipo: 'subtitulo', texto: x.slice(3).trim() } : { tipo: 'parrafo', texto: x }));
+}
+
+/** mc.mis_terminos → lista de aceptaciones válidas (más reciente primero). */
+export function normalizarMisTerminos(j) {
+  if (!j || j.ok !== true || !Array.isArray(j.aceptaciones)) return null;
+  return j.aceptaciones.filter((a) => a && FECHA_V.test(String(a.version ?? '')) && HEX64.test(String(a.sha256 ?? '')))
+    .map((a) => ({ version: a.version, sha256: a.sha256, aceptada_at: String(a.aceptada_at ?? '') }))
+    .sort((a, b) => String(b.aceptada_at).localeCompare(String(a.aceptada_at)));
+}
+
+export const TIPOS_SOPORTE = Object.freeze([
+  ['consulta', 'Tengo una consulta'], ['acceso', 'No puedo entrar o algo no carga'], ['datos', 'Veo un dato que no me cuadra'],
+  ['seguridad', 'Algo raro con mi cuenta'], ['otro', 'Otra cosa'],
+]);
+export const ESTADOS_SOLICITUD = Object.freeze({ abierta: ['c-pend', 'Recibida'], en_curso: ['c-rev', 'En revisión'], cerrada: ['c-ok', 'Resuelta'] });
+
+/** Valida el formulario «Cuéntanos qué pasa». Devuelve el mensaje de error o null. */
+export function validarSoporte(tipo, mensaje) {
+  if (!TIPOS_SOPORTE.some(([t]) => t === tipo)) return 'Elige de qué se trata.';
+  const m = String(mensaje ?? '').trim();
+  if (m.length < 10) return 'Cuéntanos un poco más (al menos 10 caracteres).';
+  if (m.length > 1000) return 'El mensaje es muy largo (máximo 1.000 caracteres).';
+  return null;
+}
+
+/** mc.mis_solicitudes → lista; estados desconocidos se muestran como «Recibida». */
+export function normalizarSolicitudes(j) {
+  if (!j || j.ok !== true || !Array.isArray(j.solicitudes)) return null;
+  return j.solicitudes.filter((x) => x && /^MC-\d{4}-\d{1,8}$/.test(String(x.folio ?? ''))).map((x) => ({
+    folio: x.folio, tipo: TIPOS_SOPORTE.some(([t]) => t === x.tipo) ? x.tipo : 'otro',
+    estado: Object.hasOwn(ESTADOS_SOLICITUD, x.estado) ? x.estado : 'abierta',
+    creada_at: String(x.creada_at ?? ''), actualizada_at: String(x.actualizada_at ?? ''),
+  }));
+}
+
+const ESTADOS_PASO = ['listo', 'en_curso', 'pendiente', 'esperando_tu_respuesta'];
+/** mc.mi_incorporacion → {estado:'ok', disponible, …} | {estado:'error'}. Nunca inventa pasos. */
+export function normalizarIncorporacion(j) {
+  if (!j || j.ok !== true) return { estado: 'error' };
+  if (j.disponible !== true) return { estado: 'ok', disponible: false };
+  const total = Number.isInteger(j.avance?.total) && j.avance.total > 0 && j.avance.total <= 30 ? j.avance.total : 10;
+  const listos = Number.isInteger(j.avance?.listos) ? Math.max(0, Math.min(total, j.avance.listos)) : 0;
+  const pasos = (Array.isArray(j.pasos) ? j.pasos : []).filter((p) => p && Number.isInteger(p.orden) && typeof p.titulo === 'string' && p.titulo.trim())
+    .map((p) => ({ orden: p.orden, titulo: p.titulo.trim().slice(0, 140), estado: ESTADOS_PASO.includes(p.estado) ? p.estado : 'pendiente' }))
+    .sort((a, b) => a.orden - b.orden);
+  const terminado = j.terminado === true;
+  return {
+    estado: 'ok', disponible: true, terminado, total, listos,
+    actual: terminado ? total : Math.min(total, listos + 1),
+    fecha_reunion: FECHA_V.test(String(j.fecha_reunion ?? '')) ? j.fecha_reunion : null,
+    diagnostico: { emitido: j.diagnostico?.emitido === true },
+    pasos,
+  };
 }

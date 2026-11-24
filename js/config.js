@@ -19,6 +19,20 @@ export const CONFIG = Object.freeze({
     // MC-IMP-1 «Tu IVA del mes» (mc.mis_impuestos). Publicar el portal DESPUÉS de instalar la migración 202611191200.
     // Si hubiera que publicar antes, dejarlo en null: la pantalla vuelve al Pre-IVA de siempre («aún no publicado»).
     IMPUESTOS: 'mis_impuestos',
+
+    // ── MICONTADOOR-APERTURA (24-11) · contrato en descargas/micontadoor_apertura/CONTRATO_DATOS.md ──
+    // ORDEN: publicar el portal SOLO DESPUÉS de instalar en Supabase las migraciones del paquete (términos versionados,
+    // soporte y 202611231910 «Tu incorporación»). Si hubiera que publicar antes, poner estas en null: el portal vuelve
+    // a lo de hoy (términos locales con aceptar_terminos, Ayuda solo con WhatsApp y correo, sin «Tu incorporación»).
+    TERMINOS_VIGENTES: 'terminos_vigentes',     // texto vigente + SHA-256 (se verifica en el aparato antes de aceptar)
+    TERMINOS_V2: 'aceptar_terminos_v2',         // acepta versión + huella; el servidor guarda la aceptación inmutable
+    MIS_TERMINOS: 'mis_terminos',               // «Términos que aceptaste» en Mi acceso
+    TERMINOS_TEXTO: 'terminos_texto',           // texto exacto de una versión aceptada
+    SOPORTE_CREAR: 'soporte_crear',             // «Cuéntanos qué pasa» → folio MC-AAAA-NNNNN
+    MIS_SOLICITUDES: 'mis_solicitudes',         // «Tus solicitudes»
+    INCORPORACION: 'mi_incorporacion',          // «Tu incorporación» (ONBOARDING-V2)
+    DIAGNOSTICO: null,                          // «Tu diagnóstico "Aquí partimos"»: aún sin informe ni RPC (espacio listo)
+    HISTORIAL_IMPUESTOS: null,                  // historial anual (otro paquete, feat/reporte-historial-sii): menú oculto mientras sea null
   }),
 
   // Hosts desde los que se aceptan enlaces de documentos (PDF firmados de Storage). Vacío = no se enlaza nada.

@@ -1,3 +1,4 @@
+import { sha256Hex } from './util.js';
 // MiContadoor · DATOS FICTICIOS para el modo demo (?demo=1). Ninguna persona, empresa ni monto es real.
 // Simula al servidor: respeta la forma del contrato mc y aplica las mismas omisiones (plan y permisos por vínculo).
 const REF = {
@@ -221,10 +222,77 @@ const DATOS = {
 };
 
 const clon = (x) => JSON.parse(JSON.stringify(x));
+
+// ── MICONTADOOR-APERTURA · términos del servidor (mismo texto V1 del 16-11, en formato de texto: «## » = subtítulo) ──
+export const TERMINOS_V1_TEXTO = [
+  '## 1. Qué es MiContadoor',
+  'MiContadoor es el portal de clientes de Asesorías Contadoor Ltda. (en adelante, «Contadoor»). Aquí ves la información que tu equipo Contadoor publica sobre tu empresa: reportes mensuales, estado de cuenta, proyecciones y trabajos especiales. El portal es solo de consulta: no reemplaza a tu equipo, al SII ni a la Tesorería.',
+  '## 2. Tu acceso es personal',
+  'Tu cuenta es solo para ti. No compartas tu contraseña. Si otra persona de tu empresa necesita acceso, pídelo a tu equipo Contadoor y le crearemos su propia cuenta. Si crees que alguien entró con tus datos, cambia tu contraseña y avísanos de inmediato.',
+  '## 3. Las cifras',
+  'Los montos de tu reporte son los que tu equipo revisó y confirmó. Las proyecciones (Pre-IVA y Pre-Renta) son estimaciones con la información disponible a la fecha y pueden cambiar; no son cifras definitivas. Ante cualquier diferencia, manda lo que te confirme tu equipo por escrito.',
+  '## 4. Pagos',
+  'Los botones «Ya transferí» y «Ya lo pagué» solo nos avisan: el pago se da por recibido cuando nuestro equipo lo confirma. Contadoor nunca te pedirá que transfieras a una cuenta distinta de la que aparece en este portal.',
+  '## 5. Qué información tratamos y para qué',
+  'Datos de tu empresa y de sus socios, documentos tributarios y contables, información de pagos y tus datos de contacto, solo lo necesario para prestar el servicio contratado (contabilidad, impuestos, reportes y asesoría). Nunca la vendemos ni la usamos para publicidad de terceros.',
+  '## 6. Quién accede y dónde se guarda',
+  'Solo el equipo asignado a tu empresa y la dirección de Contadoor, con usuario personal y registro de cada acceso, bajo deber de reserva. La información se guarda en nuestro sistema de gestión con acceso controlado. Se comparte solo con el SII, la Tesorería u otros organismos cuando el servicio lo requiere, y con proveedores tecnológicos que nos dan soporte bajo confidencialidad, salvo obligación legal.',
+  '## 7. Cuánto tiempo',
+  'Mientras dure el servicio y los plazos que exige la ley para la documentación tributaria. Al terminar el servicio, tu acceso a MiContadoor se cierra y te entregamos tu información.',
+  '## 8. Tus derechos',
+  'Conforme a la Ley N° 19.628 sobre protección de la vida privada y su actualización por la Ley N° 21.719, puedes pedir en cualquier momento acceder, corregir, eliminar u oponerte al uso de tus datos, o recibir una copia de ellos, escribiendo a info@contadoor.cl.',
+  '## 9. Si algo ocurre',
+  'Si detectamos un incidente que pueda afectar tu información, te avisamos sin demora, te contamos qué pasó y qué medidas tomamos.',
+  '## 10. Cambios',
+  'Si cambiamos estos términos, te pediremos aceptarlos de nuevo al entrar. Responsable: Asesorías Contadoor Ltda., RUT 77.166.269-2 · info@contadoor.cl.',
+].join('\n\n');
+const TERMINOS_TITULO = 'Términos de uso y aviso de privacidad de MiContadoor';
+
+// Tu incorporación (forma de mc.mi_incorporacion). Pasos y fechas ficticios.
+const PASOS_INC = ['Te damos la bienvenida', 'Pagas tu plan de activación', 'Nos compartes tus claves y balances anteriores', 'Creas tu acceso a MiContadoor',
+  'Preparamos tu diagnóstico "Aquí partimos"', 'Reunión de entrega del diagnóstico'];
+function incorporacionDe(ref, opciones) {
+  if (opciones.inc === 'error') return 'error';
+  if (ref === REF.alerce || opciones.inc === 'no') return { ok: true, disponible: false };
+  const listoDiag = ref === REF.aromos || opciones.inc === 'diag';
+  const terminado = opciones.inc === 'terminado';
+  const est = terminado ? ['listo', 'listo', 'listo', 'listo', 'listo', 'listo']
+    : listoDiag ? ['listo', 'listo', 'listo', 'listo', 'listo', 'pendiente']
+      : ['listo', 'listo', 'esperando_tu_respuesta', 'en_curso', 'pendiente', 'pendiente'];
+  return { ok: true, disponible: true, terminado, avance: { listos: terminado ? 10 : listoDiag ? 9 : 4, total: 10 },
+    fecha_reunion: listoDiag || terminado ? '2026-12-02' : null, diagnostico: { emitido: listoDiag || terminado },
+    pasos: PASOS_INC.map((titulo, i) => ({ orden: i + 1, titulo, estado: est[i] })) };
+}
 const rolDe = (e, opciones) => (opciones.rol === 'consulta' ? 'consulta' : e.rol);
 
 export const demo = {
   refs: REF,
+  incorporacion(ref, opciones = {}) { return EMPRESAS.some((e) => e.ref === ref) ? incorporacionDe(ref, opciones) : null; },
+  async terminosVigentes(opciones = {}) {
+    const sha = await sha256Hex(TERMINOS_V1_TEXTO);
+    return { ok: true, version: '2026-11-16', titulo: TERMINOS_TITULO, texto: TERMINOS_V1_TEXTO, sha256: opciones.huella === 'mala' ? 'f'.repeat(64) : sha };
+  },
+  async misTerminos() { return { ok: true, aceptaciones: [{ version: '2026-11-16', sha256: await sha256Hex(TERMINOS_V1_TEXTO), aceptada_at: '2026-11-16T19:52:00Z' }] }; },
+  async terminosTexto(v) {
+    if (v !== '2026-11-16') return { ok: false, codigo: 'MC_SIN_ACCESO' };
+    return { ok: true, version: v, titulo: TERMINOS_TITULO, texto: TERMINOS_V1_TEXTO, sha256: await sha256Hex(TERMINOS_V1_TEXTO) };
+  },
+  /** Soporte en memoria (como mc.soporte_crear / mc.mis_solicitudes): folio correlativo y máx. 5 por cuenta en 24 h. */
+  soporteNuevo() {
+    const lista = [{ folio: 'MC-2026-00007', ref: REF.rio, tipo: 'datos', estado: 'cerrada', creada_at: '2026-11-18T13:10:00Z', actualizada_at: '2026-11-18T16:40:00Z' }];
+    let n = 11; let hoy = 0;
+    return {
+      crear(ref, tipo, mensaje) {
+        if (!EMPRESAS.some((e) => e.ref === ref)) return { ok: false, codigo: 'MC_SIN_ACCESO' };
+        if (String(mensaje).trim().length < 10) return { ok: false, codigo: 'MC_DATOS' };
+        if (hoy >= 5) return { ok: false, codigo: 'MC_LIMITE' };
+        hoy += 1; n += 1; const folio = `MC-2026-${String(n).padStart(5, '0')}`; const at = new Date().toISOString();
+        lista.unshift({ folio, ref, tipo, estado: 'abierta', creada_at: at, actualizada_at: at });
+        return { ok: true, folio };
+      },
+      listar(ref) { return { ok: true, solicitudes: lista.filter((x) => x.ref === ref).map(({ ref: _r, ...x }) => clon(x)) }; },
+    };
+  },
   sesion({ terminos = false } = {}) {
     return { ok: true, cuenta: { correo: 'carolina@ejemplo.cl', nombre: 'Carolina Demo', terminos_pendientes: terminos }, empresas: clon(EMPRESAS) };
   },

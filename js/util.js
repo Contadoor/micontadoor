@@ -111,3 +111,9 @@ export function pct(v) {
   if (!Number.isFinite(x)) return 0;
   return Math.max(0, Math.min(100, Math.round(x)));
 }
+
+/** SHA-256 en hexadecimal del texto en UTF-8 (igual que sha256(convert_to(texto,'UTF8')) en Postgres). */
+export async function sha256Hex(texto) {
+  const b = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(texto)));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}

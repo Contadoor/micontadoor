@@ -22,6 +22,19 @@ function leerGuardada() {
 }
 function guardar(r) { try { if (r) localStorage.setItem(CLAVE_SESION, JSON.stringify({ r })); else localStorage.removeItem(CLAVE_SESION); } catch { /* sin almacenamiento: sesión solo en memoria */ } }
 
+/** Qué partes opcionales del contrato están configuradas (las vistas no muestran lo que no existe). */
+export function capacidadesDe(cfg) {
+  const r = cfg.RPC || {};
+  return {
+    solicitudPago: !!r.SOLICITUD_PAGO,
+    terminosServidor: !!(r.TERMINOS_VIGENTES && r.TERMINOS_V2),
+    misTerminos: !!(r.MIS_TERMINOS && r.TERMINOS_TEXTO),
+    soporte: !!(r.SOPORTE_CREAR && r.MIS_SOLICITUDES),
+    incorporacion: !!r.INCORPORACION,
+    historialImpuestos: !!r.HISTORIAL_IMPUESTOS,
+  };
+}
+
 /** Backend real (Supabase). */
 export function crearApiReal(cfg) {
   const base = String(cfg.SUPABASE_URL || '').replace(/\/+$/, '');
@@ -64,7 +77,7 @@ export function crearApiReal(cfg) {
 
   return {
     modo: 'real',
-    capacidades: { solicitudPago: !!cfg.RPC.SOLICITUD_PAGO },
+    capacidades: capacidadesDe(cfg),
     tieneSesion: () => !!refresh,
     async ingresar(correo, clave) {
       if (!CORREO.test(correo) || !clave) throw new ErrorApi('CREDENCIALES');
@@ -97,6 +110,40 @@ export function crearApiReal(cfg) {
     async sesion() { const n = normalizarSesion(await rpc(cfg.RPC.SESION)); if (!n.ok) throw new ErrorApi(n.codigo); return n; },
     async resumen(ref) { if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO'); return rpc(cfg.RPC.RESUMEN, { p_ref: ref }); },
     async aceptarTerminos(v) { return rpc(cfg.RPC.TERMINOS, { p_version: v }); },
+    // ── MICONTADOOR-APERTURA: cada una devuelve null si su RPC no está configurada (el portal sigue como antes) ──
+    async terminosVigentes() { return cfg.RPC.TERMINOS_VIGENTES ? rpc(cfg.RPC.TERMINOS_VIGENTES) : null; },
+    async aceptarTerminosV2(v, sha) {
+      if (!cfg.RPC.TERMINOS_V2) throw new ErrorApi('NO_DISPONIBLE');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v)) || !/^[0-9a-f]{64}$/.test(String(sha))) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.TERMINOS_V2, { p_version: v, p_sha256: sha });
+    },
+    async misTerminos() { return cfg.RPC.MIS_TERMINOS ? rpc(cfg.RPC.MIS_TERMINOS) : null; },
+    async terminosTexto(v) {
+      if (!cfg.RPC.TERMINOS_TEXTO) return null;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v))) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.TERMINOS_TEXTO, { p_version: v });
+    },
+    async soporteCrear(ref, tipo, mensaje) {
+      if (!cfg.RPC.SOPORTE_CREAR) throw new ErrorApi('NO_DISPONIBLE');
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.SOPORTE_CREAR, { p_ref: ref, p_tipo: tipo, p_mensaje: String(mensaje).trim() });
+    },
+    async misSolicitudes(ref) {
+      if (!cfg.RPC.MIS_SOLICITUDES) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.MIS_SOLICITUDES, { p_ref: ref });
+    },
+    async incorporacion(ref) {
+      if (!cfg.RPC.INCORPORACION) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.INCORPORACION, { p_ref: ref });
+    },
+    /** Gancho del visor «Tu diagnóstico "Aquí partimos"»: aún sin RPC ni documento (CONFIG.RPC.DIAGNOSTICO = null). */
+    async diagnostico(ref) {
+      if (!cfg.RPC.DIAGNOSTICO) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.DIAGNOSTICO, { p_ref: ref });
+    },
     /** MC-5: trabajos especiales de la empresa (o uno solo por código). null si la RPC no está configurada. */
     async trabajos(ref, codigo = null) {
       if (!cfg.RPC.TRABAJOS) return null;
@@ -123,9 +170,10 @@ export function crearApiReal(cfg) {
 export function crearApiDemo(demo, opciones = {}) {
   let dentro = false; let terminos = opciones.terminos === true;
   const espera = (x) => new Promise((ok) => setTimeout(() => ok(x), 120));
+  const soporte = demo.soporteNuevo();
   return {
     modo: 'demo',
-    capacidades: { solicitudPago: opciones.solicitudes === true },
+    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: false },
     tieneSesion: () => dentro,
     async ingresar() { dentro = true; },
     async recuperar() { await espera(); },
@@ -140,6 +188,23 @@ export function crearApiDemo(demo, opciones = {}) {
       return espera(r);
     },
     async aceptarTerminos() { terminos = false; return { ok: true }; },
+    async terminosVigentes() { return espera(await demo.terminosVigentes(opciones)); },
+    async aceptarTerminosV2(v, sha) {
+      const t = await demo.terminosVigentes({});
+      if (v !== t.version || sha !== t.sha256) throw new ErrorApi('MC_TERMINOS_VERSION');
+      terminos = false; return espera({ ok: true, version: v, aceptada_at: new Date().toISOString() });
+    },
+    async misTerminos() { return espera(await demo.misTerminos()); },
+    async terminosTexto(v) { const r = await demo.terminosTexto(v); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
+    async soporteCrear(ref, tipo, mensaje) { const r = soporte.crear(ref, tipo, mensaje); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
+    async misSolicitudes(ref) { return espera(soporte.listar(ref)); },
+    async incorporacion(ref) {
+      const r = demo.incorporacion(ref, opciones);
+      if (!r) throw new ErrorApi('MC_SIN_ACCESO');
+      if (r === 'error') throw new ErrorApi('MC_ERROR');
+      return espera(r);
+    },
+    async diagnostico() { return null; },
     async trabajos(ref) {
       const r = demo.trabajos(ref, opciones);
       if (!r) throw new ErrorApi('MC_SIN_ACCESO');

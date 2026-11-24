@@ -3,6 +3,7 @@ import { html, clp, fecha, hora, mesDe, pct } from './util.js';
 import { I, icoPreIva, icoMiRenta } from './iconos.js';
 import { datosDe, saldoFavorTexto, planTexto } from './datos.js';
 import { sub, teaser, vacio, paso, waCard, chipEstadoProy, leyendaEstados, botonSolicitud } from './vistas-comunes.js';
+import { bloqueTerminosAceptados, DIAGNOSTICO_NOMBRE } from './vistas-apertura.js';
 
 const CHIP_VENCE = { por_vencer: 'c-pend', vencida: 'c-venc' };
 
@@ -127,6 +128,9 @@ export function vMas(ctx) {
     <div class="card">
       <div class="li centro"><span class="ic i-m">${I.llave}</span><div class="t"><b>Trabajos especiales</b><span class="sm">${(datosDe(ctx.resumen, 'trabajos')?.activos || []).length} en curso</span></div><button type="button" class="btn lin auto" data-ir="trabajos">Abrir</button></div>
       <div class="li centro"><span class="ic i-a">${I.persona}</span><div class="t"><b>Mi acceso</b><span class="sm">Empresas, contraseña, cerrar sesión</span></div><button type="button" class="btn lin auto" data-ir="acceso">Abrir</button></div>
+      ${ctx.incorporacion?.estado === 'ok' && ctx.incorporacion.disponible ? html`<div class="li centro"><span class="ic i-i">${I.ruta}</span><div class="t"><b>Tu incorporación</b><span class="sm">Tus pasos y ${DIAGNOSTICO_NOMBRE}</span></div><button type="button" class="btn lin auto" data-ir="incorporacion">Abrir</button></div>` : ''}
+      ${ctx.api?.capacidades?.historialImpuestos ? html`<div class="li centro"><span class="ic i-m">${I.calendario}</span><div class="t"><b>Mis impuestos · historial</b><span class="sm">Tu año mes a mes</span></div><button type="button" class="btn lin auto" data-ir="impuestos-historial">Abrir</button></div>` : ''}
+      <div class="li centro"><span class="ic i-v">${I.ayuda}</span><div class="t"><b>Ayuda</b><span class="sm">WhatsApp, correo y tus solicitudes</span></div><button type="button" class="btn lin auto" data-ir="ayuda">Abrir</button></div>
     </div>
     <div class="card miplan"><div class="hd"><h3>Mi plan</h3><span class="chip c-conc">${planTexto(ctx.resumen?.plan_nivel, ctx.resumen?.plan_nombre)}</span></div>
       <div class="fila"><div class="t"><b>✓ Reporte mensual e historial</b></div></div>
@@ -155,7 +159,9 @@ export function vAcceso(ctx) {
       <button type="button" class="btn lin" data-accion="cambiar-clave">Cambiar mi contraseña</button>
       <button type="button" class="btn lin" data-accion="salir">Cerrar sesión</button>
       <button type="button" class="btn lin gris" data-accion="salir-todos">Cerrar sesión en todos mis aparatos</button>
-      <p class="xs m0 mt8">Úsalo si perdiste tu celular o crees que alguien conoce tu contraseña.</p></div></div>`;
+      <p class="xs m0 mt8">Úsalo si perdiste tu celular o crees que alguien conoce tu contraseña.</p></div>
+    ${ctx.api?.capacidades?.misTerminos ? bloqueTerminosAceptados(ctx.misTerminos) : ''}
+    <div class="card"><div class="li centro"><span class="ic i-v">${I.ayuda}</span><div class="t"><b>¿Necesitas ayuda?</b><span class="sm">Escríbenos o revisa tus solicitudes</span></div><button type="button" class="btn lin auto" data-ir="ayuda">Ayuda</button></div></div></div>`;
 }
 
 export function hojaEmpresas(ctx) {

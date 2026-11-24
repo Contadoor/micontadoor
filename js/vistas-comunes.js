@@ -30,10 +30,17 @@ export function tabs(ctx, actual) {
     ['reporte', 'Reporte', I.grafico, ['reporte', 'historial']],
     p.verMiCuenta ? ['cuenta', 'Mi cuenta', I.tarjeta, ['cuenta', 'pago']] : null,
     (p.preIva !== 'sin_permiso' || p.preRenta !== 'sin_permiso') ? ['preiva', 'Proyecciones', I.proyecciones, ['preiva', 'prerenta']] : null,
-    ['mas', 'Más', I.mas, ['mas', 'trabajos', 'acceso']],
+    ['mas', 'Más', I.mas, ['mas', 'trabajos', 'acceso', 'ayuda', 'incorporacion']],
   ].filter(Boolean);
   // Solo en computador (barra lateral): accesos directos que en el celular viven dentro de «Más».
-  const esc = [['trabajos', 'Trabajos especiales', I.llave, ['trabajos']], ['acceso', 'Mi acceso', I.persona, ['acceso']]];
+  const inc = ctx.incorporacion?.estado === 'ok' && ctx.incorporacion.disponible;
+  const esc = [
+    inc ? ['incorporacion', 'Tu incorporación', I.ruta, ['incorporacion']] : null,
+    // Historial anual de impuestos: lo construye otro paquete (feat/reporte-historial-sii). Aquí solo el lugar en el menú,
+    // oculto mientras CONFIG.RPC.HISTORIAL_IMPUESTOS sea null.
+    ctx.api?.capacidades?.historialImpuestos ? ['impuestos-historial', 'Mis impuestos · historial', I.calendario, ['impuestos-historial']] : null,
+    ['trabajos', 'Trabajos especiales', I.llave, ['trabajos']], ['acceso', 'Mi acceso', I.persona, ['acceso']], ['ayuda', 'Ayuda', I.ayuda, ['ayuda']],
+  ].filter(Boolean);
   const boton = ([r, t, ic, g], extra = r === 'mas' && actual !== 'mas' ? 'sub-on' : '') => html`<button type="button" data-ir="${r}" class="${(g.includes(actual) ? 'on ' : '') + extra}" ${g.includes(actual) ? html`aria-current="page"` : ''}>${ic}${t}</button>`;
   return html`<nav class="tabs" aria-label="Navegación principal" data-n="${items.length}">
     <div class="nav-marca solo-esc">${iconoB(34, 'circulo', 'gBh')}<span class="wm"><span class="mi">Mi</span><span class="co">Contadoor</span></span></div>
