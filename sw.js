@@ -2,11 +2,11 @@
 // · toda petición a otro origen (Supabase, fuentes, WhatsApp) pasa directo a la red, sin tocar la caché;
 // · dentro del propio sitio solo se guarda lo que está en la lista ESQUELETO, y se usa SOLO sin conexión (red primero).
 importScripts('/js/sw-avisos.js');                          // MC-6: validación pura del aviso (self.MC_AVISO)
-const VERSION = 'mc-v1.0.0-6';
+const VERSION = 'mc-v1.0.0-7';
 const ESQUELETO = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/api.js', '/js/config.js', '/js/datos.js', '/js/demo.js', '/js/iconos.js', '/js/push.js', '/js/sw-avisos.js', '/js/util.js',
-  '/js/vistas-acceso.js', '/js/vistas-avisos.js', '/js/vistas-comunes.js', '/js/vistas-cuenta.js', '/js/vistas-reporte.js', '/js/vistas-impuestos.js', '/js/vistas-apertura.js',
+  '/js/vistas-acceso.js', '/js/vistas-avisos.js', '/js/vistas-comunes.js', '/js/vistas-cuenta.js', '/js/vistas-reporte.js', '/js/vistas-impuestos.js', '/js/vistas-apertura.js', '/js/vistas-instalar.js',
   '/img/contadoor_lockup_white.png', '/img/contadoor_lockup_glossy.png', '/img/icono-192.png', '/img/icono-512.png',
 ];
 

@@ -12,6 +12,7 @@ import { vImpuestos } from './vistas-impuestos.js';
 import { vTerminosServidor, vAyuda, vIncorporacion, hojaTerminos } from './vistas-apertura.js';
 import { registrarServiceWorker, estadoActual, activarAvisos, desactivarAvisos } from './push.js';
 import { vNovedades } from './vistas-avisos.js';
+import { vGuiaIos, mostrarGuiaIos, entornoGuia, esSafari, cerrarGuia } from './vistas-instalar.js';
 
 const VERSION = '1.1.0';
 const RUTAS_ACCESO = new Set(['ingreso', 'recuperar', 'activar', 'terminos']);
@@ -111,7 +112,10 @@ function pintar() {
   }
   const hoja = st.hoja ? st.hoja() : '';
   $app.classList.toggle('sin-tabs', !conTabs);
-  $app.innerHTML = String(html`${franja}${cuerpo}${conTabs ? tabs(ctx(), r) : ''}${hoja}`);
+  // Guía para instalar en iPhone (Android la ofrece solo). En la demo se puede forzar con ?ios=1.
+  const envG = entornoGuia();
+  const guia = (q.get('ios') === '1' && esDemo) || mostrarGuiaIos(envG) ? vGuiaIos({ safari: esSafari(envG.ua) }) : '';
+  $app.innerHTML = String(html`${franja}${guia}${cuerpo}${conTabs ? tabs(ctx(), r) : ''}${hoja}`);
   hidratar();
   asegurarRuta(RUTAS_ACCESO.has(r) || !st.sesion ? (RUTAS_ACCESO.has(r) ? r : 'ingreso') : r);
   const clave = r + '/' + a;
@@ -266,6 +270,7 @@ document.addEventListener('click', async (ev) => {
   const a = ev.target.closest('[data-accion]');
   if (!a) return;
   const acc = a.dataset.accion;
+  if (acc === 'cerrar-guia-ios') { cerrarGuia(); if (esDemo) q.delete('ios'); pintar(); return; }
   if (acc === 'cerrar-hoja') { if (ev.target === a || a.tagName === 'BUTTON') { st.hoja = null; pintar(); } return; }
   if (acc === 'empresas') { st.hoja = () => hojaEmpresas(ctx()); pintar(); return; }
   if (acc === 'elegir') {
