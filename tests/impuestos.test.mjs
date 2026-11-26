@@ -69,10 +69,14 @@ test('etiquetas del monto (Luciano 19-11): Pre-IVA estimado antes del cierre, IV
   const sii = base(); sii.oficial = { fuente: 'sii_declarado', total: 777777 };
   const ss = String(vImpuestos(ctx(), normalizarImpuestos(sii)));
   assert.ok(!ss.includes('$777.777') && ss.includes('Estimado con datos del SII') && ss.includes('$898.882'));
-  // Sin reporte pero con Pre-IVA enviado por el analista: manda esa estimación, con la misma etiqueta.
+  // R4 · D6: un Pre-IVA «enviado» SIN estado del servidor no se presenta como revisado (fail-closed): manda la estimación del SII.
   const pv = base(); pv.preiva_enviado = { total: 880000, enviado_en: '2026-11-16T12:00:00Z' };
   const sp = String(vImpuestos(ctx(), normalizarImpuestos(pv)));
-  assert.ok(sp.includes('$880.000') && sp.includes('Estimado con datos del SII') && sp.includes('Revisado por tu analista'));
+  assert.ok(!sp.includes('$880.000') && sp.includes('$898.882') && sp.includes('IVA estimado') && !sp.includes('Revisado por tu analista'));
+  // Con estado_iva «revisado» del servidor (IVA validado en Contable): monto revisado con su estado, sin «Validado por Contadoor».
+  const rv = base(); rv.estado_iva = 'revisado'; rv.revisado = { total: 880000, debito: 1, credito: 1, remanente: 0, ppm: 0, validado_en: '2026-11-16T12:00:00Z' };
+  const sr = String(vImpuestos(ctx(), normalizarImpuestos(rv)));
+  assert.ok(sr.includes('$880.000') && sr.includes('IVA revisado, pendiente de publicación definitiva') && sr.includes('Revisado por tu analista') && !sr.includes('Validado por Contadoor'));
   // Con reporte, el Pre-IVA enviado no cuenta.
   const ambos = base(); ambos.oficial = rep.oficial; ambos.preiva_enviado = { total: 880000 };
   assert.equal(totalMostrado(normalizarImpuestos(ambos)), 1050000);
@@ -117,4 +121,27 @@ test('SII-OBS-2: cartas y cumplimiento con lista blanca, fail-closed y escapados
   const hn = String(vImpuestos(ctx(), normalizarImpuestos(nc)));
   assert.ok(hn.includes('Hay condiciones por regularizar') && hn.includes('Condición pendiente (ejemplo)') && !hn.includes('>Otra<') && hn.includes('Requiere atención'));
   assert.equal(normalizarImpuestos({ ...base(), observaciones: { items: [], cumplimiento: { disponible: true, cumple: 'si' } } }).obs.cumplimiento.disponible, false, 'cumple no booleano = no se muestra');
+});
+// ── R2 (AUTO-C02/C03): estados nuevos del F29 en «Tu IVA del mes» ──
+test('R2 · normalizarImpuestos acepta sin_verificar y no_encontrado (distintos de no_declarado) y descarta estados desconocidos', () => {
+  const j = base();
+  j.f29 = [{ periodo: '202610', estado: 'por_declarar', vence: '2026-11-20' }, { periodo: '202609', estado: 'no_encontrado', vence: '2026-10-20' },
+           { periodo: '202608', estado: 'sin_verificar', vence: '2026-09-22' }, { periodo: '202607', estado: 'inventado', vence: '2026-08-20' }];
+  const n = normalizarImpuestos(j);
+  assert.deepEqual(n.f29.map((x) => x.estado), ['por_declarar', 'no_encontrado', 'sin_verificar']);
+});
+
+test('R4 · D6: cuatro estados del IVA decididos por el servidor; ninguno provisional se muestra como publicado ni como F29 presentado', () => {
+  const con = (o) => { const j = base(); Object.assign(j, o); return normalizarImpuestos(j); };
+  assert.equal(con({}).estado_iva, 'estimado');
+  assert.equal(con({ estado_iva: 'inventado' }).estado_iva, 'estimado', 'estado desconocido → estimado');
+  assert.equal(con({ estado_iva: 'publicado' }).estado_iva, 'estimado', '«publicado» sin foto oficial no se cree');
+  assert.equal(con({ estado_iva: 'revisado' }).estado_iva, 'estimado', '«revisado» sin monto revisado no se afirma');
+  const er = con({ estado_iva: 'en_revision' });
+  assert.equal(er.estado_iva, 'en_revision'); assert.equal(er.preiva, null);
+  const s = String(vImpuestos(ctx(), er));
+  assert.ok(s.includes('Información en revisión') && s.includes('$898.882') && !s.includes('Validado por Contadoor'));
+  const pub = con({ estado_iva: 'publicado', oficial: { fuente: 'reporte', total: 1050000, debito: 1748000, credito: 969000, remanente: 118868, ppm: 238750, confirmado_en: '2026-11-14T15:30:00Z' } });
+  assert.equal(pub.estado_iva, 'publicado');
+  assert.ok(String(vImpuestos(ctx(), pub)).includes('Reporte mensual publicado'));
 });

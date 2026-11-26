@@ -186,6 +186,13 @@ export function crearApiReal(cfg) {
       if (!cfg.RPC.PUSH_PROBAR) throw new ErrorApi('NO_DISPONIBLE');
       return rpc(cfg.RPC.PUSH_PROBAR, {});
     },
+    /** REPORTE-AUTO C: el reporte mensual cerrado (foto). null si la RPC no está configurada. p_periodo 'AAAA-MM' o null (= el último cerrado). */
+    async reporte(ref, periodo = null) {
+      if (!cfg.RPC.REPORTE) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      if (periodo !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.REPORTE, { p_ref: ref, p_periodo: periodo });
+    },
     async solicitudPago(datos) {
       if (!cfg.RPC.SOLICITUD_PAGO) throw new ErrorApi('NO_DISPONIBLE');
       // Contrato por definir en MC-3 (crea tarea a Conciliación/analista; NUNCA marca el pago). El comprobante irá a Storage.
@@ -251,6 +258,11 @@ export function crearApiDemo(demo, opciones = {}) {
     async pushDesuscribir() { return espera({ ok: true, desactivadas: 1 }); },
     async pushProbar() { return espera({ ok: true }); },
     async avisosCorreo(activo) { demo.correo = activo === true; return espera({ ok: true, activo: demo.correo }); },
+    async reporte(ref) {
+      const r = demo.reporte(ref, opciones);
+      if (!r) throw new ErrorApi('MC_SIN_ACCESO');
+      return espera(r);
+    },
     async solicitudPago() { if (opciones.solicitudes !== true) throw new ErrorApi('NO_DISPONIBLE'); return espera({ ok: true }); },
   };
 }

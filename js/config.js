@@ -41,6 +41,10 @@ export const CONFIG = Object.freeze({
     PUSH_DESUSCRIBIR: 'push_desuscribir',
     PUSH_PROBAR: 'push_probar',
     AVISOS_CORREO: 'avisos_correo',     // R2: hoy el servidor responde disponible=false → la UI muestra «Pronto»
+
+    // REPORTE-AUTO C: el reporte mensual CERRADO (mc.mi_reporte). Publicar el portal DESPUÉS de instalar la migración 202611211800.
+    // Si hubiera que publicar antes, dejarlo en null: la pantalla Reporte sigue con «Tu reporte aún no está publicado».
+    REPORTE: 'mi_reporte',
   }),
 
   // Hosts desde los que se aceptan enlaces de documentos (PDF firmados de Storage). Vacío = no se enlaza nada.
