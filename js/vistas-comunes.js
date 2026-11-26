@@ -26,7 +26,7 @@ export function cabecera(ctx, extra = '') {
 export function tabs(ctx, actual) {
   const p = ctx.perm;
   const items = [
-    ['inicio', 'Inicio', I.inicio, ['inicio']],
+    ['inicio', 'Inicio', I.inicio, ['inicio', 'novedades']],
     ['reporte', 'Reporte', I.grafico, ['reporte', 'historial']],
     p.verMiCuenta ? ['cuenta', 'Mi cuenta', I.tarjeta, ['cuenta', 'pago']] : null,
     (p.preIva !== 'sin_permiso' || p.preRenta !== 'sin_permiso') ? ['preiva', 'Proyecciones', I.proyecciones, ['preiva', 'prerenta']] : null,

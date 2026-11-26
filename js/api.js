@@ -2,6 +2,7 @@
 // Sin dependencias: Auth (GoTrue) y PostgREST por fetch. Solo clave pública. Nunca se registran tokens ni datos.
 import { normalizarSesion } from './datos.js';
 import { CORREO, UUID } from './util.js';
+import { pushConfigurado } from './push.js';
 
 const CLAVE_SESION = 'mc_sesion_v1';      // solo el refresh token y su vencimiento (la sesión del aparato)
 
@@ -77,7 +78,7 @@ export function crearApiReal(cfg) {
 
   return {
     modo: 'real',
-    capacidades: capacidadesDe(cfg),
+    capacidades: { ...capacidadesDe(cfg), novedades: !!cfg.RPC.AVISOS && !!cfg.RPC.AVISOS_LEIDOS, push: pushConfigurado(cfg) },
     tieneSesion: () => !!refresh,
     async ingresar(correo, clave) {
       if (!CORREO.test(correo) || !clave) throw new ErrorApi('CREDENCIALES');
@@ -158,6 +159,33 @@ export function crearApiReal(cfg) {
       if (periodo !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))) throw new ErrorApi('MC_DATOS');
       return rpc(cfg.RPC.IMPUESTOS, { p_ref: ref, p_periodo: periodo });
     },
+    // ── MC-6 · Novedades y push (cada una exige su RPC en CONFIG.RPC; sin ella: NO_DISPONIBLE, nunca se inventa) ──
+    async avisos(ref) {
+      if (!cfg.RPC.AVISOS) throw new ErrorApi('NO_DISPONIBLE');
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.AVISOS, { p_ref: ref, p_limite: 30 });
+    },
+    async avisosLeidos(ref, ids) {
+      if (!cfg.RPC.AVISOS_LEIDOS) throw new ErrorApi('NO_DISPONIBLE');
+      if (!UUID.test(ref) || (ids !== null && (!Array.isArray(ids) || ids.length > 200 || !ids.every((x) => Number.isInteger(x) && x > 0)))) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.AVISOS_LEIDOS, { p_ref: ref, p_ids: ids });
+    },
+    async pushSuscribir({ endpoint, p256dh, auth, plataforma }) {
+      if (!cfg.RPC.PUSH_SUSCRIBIR) throw new ErrorApi('NO_DISPONIBLE');
+      return rpc(cfg.RPC.PUSH_SUSCRIBIR, { p_endpoint: String(endpoint || ''), p_p256dh: String(p256dh || ''), p_auth: String(auth || ''), p_plataforma: plataforma });
+    },
+    async pushDesuscribir(endpoint, todas = false) {
+      if (!cfg.RPC.PUSH_DESUSCRIBIR) return { ok: true };
+      return rpc(cfg.RPC.PUSH_DESUSCRIBIR, { p_endpoint: endpoint ? String(endpoint) : null, p_todas: todas === true });
+    },
+    async avisosCorreo(activo) {
+      if (!cfg.RPC.AVISOS_CORREO) throw new ErrorApi('NO_DISPONIBLE');
+      return rpc(cfg.RPC.AVISOS_CORREO, { p_activo: activo === true });
+    },
+    async pushProbar() {
+      if (!cfg.RPC.PUSH_PROBAR) throw new ErrorApi('NO_DISPONIBLE');
+      return rpc(cfg.RPC.PUSH_PROBAR, {});
+    },
     async solicitudPago(datos) {
       if (!cfg.RPC.SOLICITUD_PAGO) throw new ErrorApi('NO_DISPONIBLE');
       // Contrato por definir en MC-3 (crea tarea a Conciliación/analista; NUNCA marca el pago). El comprobante irá a Storage.
@@ -173,7 +201,9 @@ export function crearApiDemo(demo, opciones = {}) {
   const soporte = demo.soporteNuevo();
   return {
     modo: 'demo',
-    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: false },
+    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: false,
+      // MC-6: en la demo hay Novedades siempre; el push se SIMULA (opciones.avisos = inactivo | activo | bloqueado | ios | no_soportado).
+      novedades: true, push: true, pushDemo: opciones.avisos || 'inactivo' },
     tieneSesion: () => dentro,
     async ingresar() { dentro = true; },
     async recuperar() { await espera(); },
@@ -215,6 +245,12 @@ export function crearApiDemo(demo, opciones = {}) {
       if (!r) throw new ErrorApi('MC_SIN_ACCESO');
       return espera(r);
     },
+    async avisos(ref) { const r = demo.avisos(ref, opciones); if (!r) throw new ErrorApi('MC_SIN_ACCESO'); return espera(r); },
+    async avisosLeidos(ref, ids) { return espera(demo.avisosLeidos(ref, ids)); },
+    async pushSuscribir() { return espera({ ok: true, activas: 1 }); },
+    async pushDesuscribir() { return espera({ ok: true, desactivadas: 1 }); },
+    async pushProbar() { return espera({ ok: true }); },
+    async avisosCorreo(activo) { demo.correo = activo === true; return espera({ ok: true, activo: demo.correo }); },
     async solicitudPago() { if (opciones.solicitudes !== true) throw new ErrorApi('NO_DISPONIBLE'); return espera({ ok: true }); },
   };
 }

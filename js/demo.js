@@ -267,8 +267,43 @@ function incorporacionDe(ref, opciones) {
 }
 const rolDe = (e, opciones) => (opciones.rol === 'consulta' ? 'consulta' : e.rol);
 
+// MC-6 · Novedades ficticias (forma de mc.avisos). El servidor las crea POR VÍNCULO; aquí se simula su filtro de permisos.
+const hace = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
+const AVISOS = {
+  [REF.rio]: [
+    { id: 100, evento: 'cobranza', titulo: 'Tienes una factura pendiente 📄', texto: 'Revisa el detalle y cómo pagar en Mi cuenta. Si ya pagaste, gracias.', ruta: 'cuenta', h: 1 },
+    { id: 101, evento: 'reporte_listo', titulo: 'Tu reporte de octubre está listo 📊', texto: 'Revisa lo que pagas este mes y cómo llegamos a tu impuesto. También te llegó por correo.', ruta: 'reporte', h: 3 },
+    { id: 102, evento: 'pago_confirmado', titulo: 'Pago confirmado ✅', texto: 'Registramos tu pago. Puedes ver el detalle en Mi cuenta → Pagado.', ruta: 'cuenta/pagado', h: 20 },
+    { id: 103, evento: 'tramite_avanzo', titulo: 'Tu trámite avanzó ✍️', texto: 'Firma en notaría', ruta: 'trabajos', h: 30, leido: true },
+    { id: 104, evento: 'iva_vence', titulo: 'Tu IVA vence el 19 ⏰', texto: 'Revisa el monto en tu reporte y paga a tiempo para evitar multas e intereses.', ruta: 'reporte', h: 50, leido: true },
+  ],
+  [REF.aromos]: [
+    { id: 201, evento: 'faltan_compras', titulo: 'Ojo: faltan facturas de compra ⚠️', texto: 'Tu analista no encuentra algunas facturas de compra de octubre. Si las tienes, pídeselas a tu proveedor o escríbenos: así se pueden rebajar de tu IVA.', ruta: 'inicio', h: 5 },
+    { id: 202, evento: 'reporte_listo', titulo: 'Tu reporte de octubre está listo 📊', texto: 'Revisa lo que pagas este mes y cómo llegamos a tu impuesto. También te llegó por correo.', ruta: 'reporte', h: 26 },
+  ],
+  [REF.alerce]: [
+    { id: 301, evento: 'reporte_listo', titulo: 'Tu reporte de octubre está listo 📊', texto: 'Revisa lo que pagas este mes y cómo llegamos a tu impuesto. También te llegó por correo.', ruta: 'reporte', h: 8 },
+    { id: 302, evento: 'pago_confirmado', titulo: 'Pago confirmado ✅', texto: 'Registramos tu pago.', ruta: 'cuenta/pagado', h: 9 },   // el «servidor» lo omite al usuario adicional
+  ],
+};
+const leidos = new Set();
+
 export const demo = {
   refs: REF,
+  correo: true,                         // R2: preferencia de correo simulada (la cambia «Avisos por correo»)
+  /** Igual que mc.avisos(p_ref): por vínculo; sin Mi cuenta, el servidor no entrega avisos de pagos. */
+  avisos(ref, opciones = {}) {
+    const e = EMPRESAS.find((x) => x.ref === ref);
+    if (!e) return null;
+    const rol = opciones.rol === 'consulta' ? 'consulta' : e.rol;
+    const lista = (AVISOS[ref] || []).filter((a) => rol === 'titular' || (a.evento !== 'pago_confirmado' && a.evento !== 'cobranza'))
+      .map((a) => ({ id: a.id, evento: a.evento, titulo: a.titulo, texto: a.texto, ruta: a.ruta, creado_at: hace(a.h), leido: a.leido === true || leidos.has(a.id) }));
+    return { ok: true, no_leidos: lista.filter((a) => !a.leido).length, avisos: lista, correo: { activo: this.correo !== false && opciones.correo !== '0', disponible: true } };
+  },
+  avisosLeidos(ref, ids) {
+    for (const a of AVISOS[ref] || []) if (ids === null || ids.includes(a.id)) leidos.add(a.id);
+    return { ok: true };
+  },
   incorporacion(ref, opciones = {}) { return EMPRESAS.some((e) => e.ref === ref) ? incorporacionDe(ref, opciones) : null; },
   async terminosVigentes(opciones = {}) {
     const sha = await sha256Hex(TERMINOS_V1_TEXTO);

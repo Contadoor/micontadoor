@@ -64,7 +64,21 @@ if (ruts.length) problemas.push(`demo.js: RUT que no son ficticios: ${ruts.join(
 // 4. Avisos de publicación
 if (!CONFIG.SUPABASE_URL) avisos.push('config.js: SUPABASE_URL vacío → el sitio solo funciona en modo demo');
 if (CONFIG.RPC.SOLICITUD_PAGO === null) avisos.push('"Ya transferí" / "Ya lo pagué" quedan en «Próximamente» (no hay RPC en el contrato mc)');
-if (CONFIG.AVISOS_PUSH) problemas.push('config.js: AVISOS_PUSH debe ser false en la V1');
+// MC-6: el push solo se enciende completo (clave PÚBLICA VAPID de MiContadoor + las RPC); nunca una clave privada en el repo.
+if (CONFIG.AVISOS_PUSH) {
+  if (!/^[A-Za-z0-9_-]{87}$/.test(CONFIG.VAPID_PUBLICA || '')) problemas.push('config.js: AVISOS_PUSH sin una VAPID_PUBLICA válida (87 caracteres base64url)');
+  for (const k of ['AVISOS', 'AVISOS_LEIDOS', 'PUSH_SUSCRIBIR', 'PUSH_DESUSCRIBIR', 'PUSH_PROBAR']) if (!CONFIG.RPC[k]) problemas.push(`config.js: AVISOS_PUSH encendido sin RPC.${k}`);
+} else avisos.push('Avisos push apagados (AVISOS_PUSH = false): se encienden con MC6A + MC6B instalados y la VAPID pública de MiContadoor');
+if (CONFIG.VAPID_PUBLICA && !/^[A-Za-z0-9_-]{87}$/.test(CONFIG.VAPID_PUBLICA)) problemas.push('config.js: VAPID_PUBLICA no parece una clave pública VAPID');
+if (!CONFIG.RPC.AVISOS) avisos.push('Novedades del servidor apagadas (RPC.AVISOS = null) hasta instalar MC6A');
+{ const sw = readFileSync(join(RAIZ, 'sw.js'), 'utf8');
+  if (!sw.includes("importScripts('/js/sw-avisos.js')")) problemas.push('sw.js: no carga js/sw-avisos.js (validación del aviso)');
+  if (/showNotification\((?!a\.titulo)/.test(sw)) problemas.push('sw.js: showNotification con un título que no pasó por MC_AVISO.avisoSeguro'); }
+// El permiso de notificaciones solo se pide en push.js (activarAvisos, desde un clic): nunca al cargar.
+for (const p of texto.filter((x) => /\/js\/.*\.js$/.test(x))) {
+  const s2 = readFileSync(p, 'utf8'); const rel = p.slice(RAIZ.length);
+  if (/requestPermission/.test(s2) && !rel.endsWith('js/push.js')) problemas.push(`${rel}: pide permiso de notificaciones fuera de push.js`);
+}
 
 console.log(problemas.length ? 'PROBLEMAS:\n - ' + problemas.join('\n - ') : 'Sin problemas de seguridad detectados.');
 if (avisos.length) console.log('Avisos:\n - ' + avisos.join('\n - '));

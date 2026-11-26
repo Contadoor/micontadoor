@@ -25,7 +25,8 @@ Abre en Chrome: **http://127.0.0.1:8765/?demo=1**. Una franja morada avisa que l
 | `&tema=claro` / `oscuro` / `auto` | Apariencia para esa visita. El cliente la elige en Más → Apariencia y queda guardada en su aparato. |
 | `&solicitudes=1` | Muestra cómo funcionarían «Ya transferí» y «Ya lo pagué» cuando exista la RPC. Por defecto aparecen en «Próximamente». |
 | `&terminos=1` | Muestra la pantalla de términos del primer ingreso. |
-| `#/ruta` | `ingreso`, `recuperar`, `activar`, `inicio`, `reporte`, `historial`, `cuenta`, `cuenta/pagado`, `pago/cp-f29-10`, `preiva`, `prerenta`, `trabajos`, `mas`, `acceso`. |
+| `&avisos=…` | MC-6: simula el estado del push en Más → Avisos (`activo`, `bloqueado`, `ios`, `no_soportado`; por defecto, por activar). |
+| `#/ruta` | `ingreso`, `recuperar`, `activar`, `inicio`, `reporte`, `historial`, `cuenta`, `cuenta/pagado`, `pago/cp-f29-10`, `preiva`, `prerenta`, `trabajos`, `mas`, `acceso`, `novedades`. |
 
 Pruebas y revisiones:
 
@@ -108,7 +109,12 @@ Pasos, en orden y cada uno con su GO:
    - Agregar el host de Storage en `HOSTS_DOCUMENTOS` y en `connect-src`.
 7. **MC-4 Pre-IVA / Pre-Renta:** fotos que publica el analista, con su estado.
 8. **MC-5 Trabajos especiales (rama `feat/mc5-trabajos`, backend `sql/micontadoor-mc5`, NO instalado):** RPC `mc.trabajos(p_ref, p_codigo?)` sobre vistas internas en lista blanca (`mc.v_trabajos`, `mc.v_trabajo_pasos` solo con `texto_cliente`, cuotas, factura de producción y documentos marcados para el cliente). La app la llama después de `empresa_resumen` (`CONFIG.RPC.TRABAJOS`) y reemplaza la sección `trabajos` con `normalizarTrabajos()` (`js/datos.js`). Sin "Mi cuenta" en el vínculo no llega ningún monto; sin facturas, no llega el folio. Si la RPC falla, la pantalla muestra un aviso, nunca datos. Si MC-5 aún no está instalado al publicar, dejar `RPC.TRABAJOS = null`. La descarga de PDF de los documentos queda para la Edge `mc-documento-url` (otra etapa): hoy dice «PDF próximamente».
-9. **MC-6 Avisos** (fuera de la V1): VAPID `MC_VAPID_*`, `mc.push_suscripciones` y `mc-push-send`. Activar `js/push.js` y el bloque comentado de `sw.js`.
+9. **MC-6 Avisos (backend MC6A instalado en producción; front encendido en `feat/mc6-avisos-r4`):** Novedades en Inicio (`#/novedades`, leídas / no leídas) y push al celular.
+    - Más → **Avisos**: botón explícito «Activar avisos en este celular» (el permiso se pide solo ahí), aviso de prueba y desactivar. En iPhone explica cómo instalar la app (iOS 16.4+); con el permiso bloqueado, cómo volver a darlo.
+    - `sw.js` carga `js/sw-avisos.js`, que revalida cada aviso: sin `$`, cifras de 3+ dígitos, RUT ni correos en la pantalla bloqueada (si no, texto genérico) y solo rutas propias al tocarlo.
+    - Al cerrar sesión se desactiva el push de ese aparato; «en todos mis aparatos» lo desactiva en todos.
+    - **R2 (13-11):** también por **correo** (Edge `mc-push-send` + Microsoft Graph, línea gráfica MiContadoor). Interruptor «Avisos por correo» en Más → Avisos (`RPC.AVISOS_CORREO`); horario 09:00–19:00; un correo agrupado por cuenta como máximo cada 60 min; asunto sin montos, RUT ni razón social.
+    - Encendido: nombres en `CONFIG.RPC.AVISOS…PUSH_PROBAR`, la clave **pública** `MC_VAPID_PUBLIC_KEY` en `CONFIG.VAPID_PUBLICA` y `AVISOS_PUSH: true` (`npm run verificar` lo exige completo). El correo está apagado en el servidor (`avisos_correo` → `disponible:false`): el interruptor se muestra deshabilitado («Pronto»). La Novedad de cobranza (R3) queda en el código, pero el servidor aún no la emite. Demo: `&avisos=activo|bloqueado|ios|no_soportado`.
 10. **Brechas del contrato que conviene cerrar:**
     - `plan_nombre` en `empresa_resumen`. Hoy "basico" se muestra como "Cumplimiento" y "pro" como "Contadoor PRO", aunque sea Estratégico.
     - Las novedades del inicio, que hoy vienen dentro de `reporte.novedades` en la demo.

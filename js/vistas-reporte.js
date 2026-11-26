@@ -5,6 +5,7 @@ import { datosDe, calcularAcumulado, saldoFavorTexto } from './datos.js';
 import { cabecera, sub, teaser, vacio, paso, waCard, chipEstadoProy } from './vistas-comunes.js';
 import { tarjetaIncorporacion } from './vistas-apertura.js';
 import { kpiImpuestos } from './vistas-impuestos.js';
+import { bloqueNovedades } from './vistas-avisos.js';
 
 const ICO_NOV = { reporte: ['i-a', I.grafico], pago: ['i-v', I.check], proy: ['i-i', I.calendario], te: ['i-m', I.llave] };
 
@@ -59,7 +60,7 @@ export function vInicio(ctx) {
     <button type="button" class="btn" data-ir="cuenta">Ver mi cuenta</button></div>` : '';
 
   return html`${cabecera(ctx, extra)}<div class="sec">
-    ${nov.length ? html`<h2>Novedades</h2><div class="card">${nov.map((n) => { const [c, ic] = ICO_NOV[n.tipo] || ICO_NOV.reporte;
+    ${ctx.avisos ? bloqueNovedades(ctx) : nov.length ? html`<h2>Novedades</h2><div class="card">${nov.map((n) => { const [c, ic] = ICO_NOV[n.tipo] || ICO_NOV.reporte;
       return html`<button type="button" class="li kpi-btn" data-ir="${n.ir}"><span class="ic ${c}">${ic}</span><div class="t"><b>${n.t}</b><span class="sm">${n.xs}</span></div><span class="punto" aria-hidden="true"></span></button>`; })}</div>` : ''}
     ${tarjetaIncorporacion(ctx.incorporacion)}${proy}${cuenta}${waCard(ctx.waEquipo)}</div>`;
 }

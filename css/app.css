@@ -337,3 +337,11 @@ a.btn{color:#fff}
 .terminos.claro h2{color:var(--m-osc)}
 .verif{color:var(--dim);letter-spacing:.02em}
 .cargando.chico{min-height:80px}
+/* MC-6 · Novedades y avisos */
+.li.leido .t b{font-weight:600;opacity:.82}
+.li .t .xs{display:block;margin-top:2px;opacity:.75}
+.hd.mt8{margin-top:18px}
+.pasos-ios{margin:8px 0 8px 18px;padding:0;font-size:13.5px;line-height:1.5}
+.pasos-ios li{margin:2px 0}
+#avisos .xs svg{width:14px;height:14px;vertical-align:-2px;margin-right:2px}
+.correo-av{border-top:1px solid var(--borde)}

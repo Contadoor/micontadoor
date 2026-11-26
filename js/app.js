@@ -2,15 +2,16 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos, normalizarImpuestos, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte } from './datos.js';
-import { html, urlSegura, CORREO, sha256Hex } from './util.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, normalizarImpuestos, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte, normalizarAvisos } from './datos.js';
+import { html, urlSegura, CORREO, sha256Hex, UUID } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
 import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
 import { vImpuestos } from './vistas-impuestos.js';
 import { vTerminosServidor, vAyuda, vIncorporacion, hojaTerminos } from './vistas-apertura.js';
-import { registrarServiceWorker } from './push.js';
+import { registrarServiceWorker, estadoActual, activarAvisos, desactivarAvisos } from './push.js';
+import { vNovedades } from './vistas-avisos.js';
 
 const VERSION = '1.1.0';
 const RUTAS_ACCESO = new Set(['ingreso', 'recuperar', 'activar', 'terminos']);
@@ -24,6 +25,7 @@ const st = {
   abiertos: new Set(), solicitudes: new Set(), hoja: null, rutaPrevia: '',
   // MICONTADOOR-APERTURA: términos del servidor, incorporación, cargas por ruta (Mi acceso, Ayuda) y el formulario de soporte
   terminosSrv: null, incorporacion: null, cache: {}, ayuda: {},
+  avisos: null, pushEstado: 'apagado',     // MC-6: Novedades de la empresa elegida y estado del push en este aparato
 };
 const ERR_CORTE = ['MC_SESION_INVALIDA', 'MC_BLOQUEADO'];
 
@@ -61,6 +63,7 @@ function ctx() {
     abiertos: st.abiertos, solicitudes: st.solicitudes, waMejora: WA_MEJORA, waEquipo: WA_EQUIPO, waAyuda: WA_AYUDA,
     incorporacion: st.incorporacion, misTerminos: st.cache.misTerminos,
     enlaceDoc: (u) => urlSegura(u, CONFIG.HOSTS_DOCUMENTOS),
+    avisos: st.avisos, pushEstado: st.pushEstado,
   };
 }
 
@@ -79,6 +82,7 @@ function vista(r, a) {
     case 'acceso': return vAcceso(c);
     case 'ayuda': return vAyuda(c, { ...st.ayuda, soporte: !!st.api.capacidades.soporte, solicitudes: st.cache.solicitudes });
     case 'incorporacion': return vIncorporacion(c, st.incorporacion);
+    case 'novedades': return vNovedades(c);
     default: return vInicio(c);
   }
 }
@@ -187,7 +191,9 @@ async function cargar(destino) {
       if (st.api.capacidades.terminosServidor) await cargarTerminos();
       ir('terminos'); return;
     }
-    const forzada = esDemo && /^[1-9]$/.test(q.get('empresa') || '') ? st.sesion.empresas[Number(q.get('empresa')) - 1]?.ref : null;
+    const forzada = esDemo && /^[1-9]$/.test(q.get('empresa') || '') ? st.sesion.empresas[Number(q.get('empresa')) - 1]?.ref
+      : (UUID.test(q.get('e') || '') ? q.get('e').toLowerCase() : null);           // MC-6: el aviso trae la empresa (ref opaco)
+    if (q.has('e')) { q.delete('e'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
     const guardada = leer('mc_empresa');
     st.empresa = st.sesion.empresas.find((x) => x.ref === forzada) || st.sesion.empresas.find((x) => x.ref === guardada) || st.sesion.empresas[0] || null;
     if (st.empresa) await cargarResumen();
@@ -226,7 +232,30 @@ async function cargarResumen() {
   st.perm = permisos(st.resumen);
   st.cargadoAt = Date.now();
   escribir('mc_empresa', st.empresa.ref);
+  await cargarAvisos();
 }
+
+// MC-6 · Novedades (fail-closed: si la RPC falla, la sección no aparece; nunca rompe el resto de la app) y estado del push.
+async function cargarAvisos() {
+  st.avisos = null;
+  if (st.api.capacidades?.novedades) {
+    try { st.avisos = normalizarAvisos(await st.api.avisos(st.empresa.ref), st.perm); } catch (e) { if (ERR_CORTE.includes(e?.codigo)) throw e; }
+  }
+  st.pushEstado = st.api.modo === 'demo' ? demoPush(st.api.capacidades.pushDemo) : (st.api.capacidades?.push ? await estadoActual().catch(() => 'no_soportado') : 'apagado');
+}
+function demoPush(v) { return { activo: 'activo', bloqueado: 'bloqueado', ios: 'ios_instalar', no_soportado: 'no_soportado' }[v] || 'inactivo'; }
+
+/** Abre la ruta de un aviso (la mandó el service worker): solo rutas propias de la lista; el ref elige la empresa. */
+const RUTA_AVISO = /^\/(\?e=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?#\/(inicio|novedades|reporte|cuenta|cuenta\/pagado|trabajos|mas)$/;
+async function abrirDesdeAviso(url) {
+  const m = RUTA_AVISO.exec(String(url || ''));
+  if (!m || !st.sesion) return;
+  const e = m[2] && st.sesion.empresas.find((x) => x.ref === m[2]);
+  if (e && e.ref !== st.empresa?.ref) { st.empresa = e; st.abiertos.clear(); try { await cargarResumen(); } catch (er) { await manejarError(er); return; } }
+  else await cargarAvisos().catch(() => {});
+  st.hoja = null; ir(m[3]);
+}
+navigator.serviceWorker?.addEventListener?.('message', (ev) => { if (ev.data?.tipo === 'mc-abrir') abrirDesdeAviso(ev.data.url); });
 
 // ── Eventos ───────────────────────────────────────────────────────────────────────────────────────────────────
 document.addEventListener('click', async (ev) => {
@@ -258,14 +287,52 @@ document.addEventListener('click', async (ev) => {
     st.ayuda = { tipo: 'seguridad' }; pintar();
     document.getElementById('cuentanos')?.scrollIntoView({ block: 'start' }); document.querySelector('#cuentanos textarea')?.focus(); return;
   }
+  // ── MC-6 · Novedades y avisos ──
+  if (acc === 'aviso') {
+    const id = Number(a.dataset.id); const it = st.avisos?.avisos.find((x) => x.id === id);
+    if (!it) return;
+    if (!it.leido) { it.leido = true; st.avisos.noLeidos = Math.max(0, st.avisos.noLeidos - 1); st.api.avisosLeidos(st.empresa.ref, [id]).catch(() => {}); }
+    ir(it.ruta); return;
+  }
+  if (acc === 'leer-todas') {
+    try { await st.api.avisosLeidos(st.empresa.ref, null); st.avisos.avisos.forEach((x) => { x.leido = true; }); st.avisos.noLeidos = 0; pintar(); } catch (er) { await manejarError(er); }
+    return;
+  }
+  if (acc === 'activar-avisos') {
+    // El permiso se pide AQUÍ, dentro del toque (Safari exige el gesto del usuario): activarAvisos pide el permiso sin ningún await antes.
+    const p = st.api.modo === 'demo' ? Promise.resolve('activo') : activarAvisos(st.api);
+    try {
+      st.pushEstado = await p;
+      st.flash = st.pushEstado === 'activo' ? 'Listo: los avisos quedaron activados en este celular.' : st.pushEstado === 'bloqueado' ? null : 'No se activaron los avisos.';
+    } catch (er) { st.flash = null; st.mensaje = { texto: mensajeError(er?.codigo) }; }
+    pintar(); return;
+  }
+  if (acc === 'desactivar-avisos') {
+    st.pushEstado = st.api.modo === 'demo' ? 'inactivo' : await desactivarAvisos(st.api);
+    st.flash = 'Desactivaste los avisos en este celular.'; pintar(); return;
+  }
+  if (acc === 'correo-avisos') {   // R2: preferencia de correo (toda la cuenta)
+    const activo = a.dataset.valor === '1';
+    try { await st.api.avisosCorreo(activo); if (st.avisos) st.avisos.correo.activo = activo;
+      st.flash = activo ? 'Listo: también te avisaremos por correo.' : 'Ya no te enviaremos avisos por correo. Seguirás viéndolos en Novedades.'; }
+    catch (er) { st.flash = 'No pudimos guardar tu preferencia. Inténtalo de nuevo.'; }
+    pintar(); return;
+  }
+  if (acc === 'probar-aviso') {
+    try { await st.api.pushProbar(); st.flash = 'Te enviamos un aviso de prueba. Debería llegarte en unos segundos.'; }
+    catch (er) { st.flash = er?.codigo === 'MC_ESPERA' ? 'Espera un minuto antes de pedir otra prueba.' : 'No pudimos enviar la prueba. Inténtalo de nuevo.'; }
+    pintar(); return;
+  }
   if (acc === 'cambiar-clave') {
     await st.api.recuperar(st.sesion.cuenta.correo).catch(() => {});
     st.flash = 'Te enviamos un enlace a tu correo para crear una contraseña nueva.'; pintar(); return;
   }
   if (acc === 'salir' || acc === 'salir-todos') {
     if (acc === 'salir-todos' && !window.confirm('¿Cerrar tu sesión en todos tus aparatos? Tendrás que volver a ingresar en cada uno.')) return;
+    // MC-6: al salir, este aparato deja de recibir avisos (celular compartido); «en todos» los apaga en todos los aparatos.
+    if (st.api.modo !== 'demo' && st.api.capacidades?.push) await desactivarAvisos(st.api, { todas: acc === 'salir-todos' });
     await st.api.salir({ todos: acc === 'salir-todos' });
-    st.sesion = null; st.empresa = null; st.resumen = null; st.perm = null; st.hoja = null; limpiarApertura();
+    st.sesion = null; st.empresa = null; st.resumen = null; st.perm = null; st.hoja = null; st.avisos = null; limpiarApertura();
     st.mensaje = { ok: true, texto: 'Cerraste tu sesión.' }; ir('ingreso');
   }
 });
@@ -401,7 +468,7 @@ async function continuarEnlace() {
 async function arrancar() {
   aplicarTema((esDemo && q.get('tema')) || leer('mc_tema') || 'auto', !(esDemo && q.get('tema')));
   st.api = esDemo
-    ? crearApiDemo(demo, { plan: q.get('plan'), rol: q.get('rol'), solicitudes: q.get('solicitudes') === '1', terminos: q.get('terminos') === '1', inc: q.get('inc'), huella: q.get('huella') })
+    ? crearApiDemo(demo, { plan: q.get('plan'), rol: q.get('rol'), solicitudes: q.get('solicitudes') === '1', terminos: q.get('terminos') === '1', inc: q.get('inc'), huella: q.get('huella'), avisos: q.get('avisos') })
     : crearApiReal(CONFIG);
   registrarServiceWorker();
   if (!st.api) {

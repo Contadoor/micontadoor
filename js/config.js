@@ -33,6 +33,14 @@ export const CONFIG = Object.freeze({
     INCORPORACION: 'mi_incorporacion',          // «Tu incorporación» (ONBOARDING-V2)
     DIAGNOSTICO: null,                          // «Tu diagnóstico "Aquí partimos"»: aún sin informe ni RPC (espacio listo)
     HISTORIAL_IMPUESTOS: null,                  // historial anual (otro paquete, feat/reporte-historial-sii): menú oculto mientras sea null
+
+    // MC-6 (avisos) · backend MC6A instalado en producción (migración 202611121400_mc6a_avisos). null = sin Novedades ni «Activar avisos».
+    AVISOS: 'avisos',                   // mc.avisos(p_ref, p_limite)
+    AVISOS_LEIDOS: 'avisos_leidos',     // mc.avisos_leidos(p_ref, p_ids)
+    PUSH_SUSCRIBIR: 'push_suscribir',
+    PUSH_DESUSCRIBIR: 'push_desuscribir',
+    PUSH_PROBAR: 'push_probar',
+    AVISOS_CORREO: 'avisos_correo',     // R2: hoy el servidor responde disponible=false → la UI muestra «Pronto»
   }),
 
   // Hosts desde los que se aceptan enlaces de documentos (PDF firmados de Storage). Vacío = no se enlaza nada.
@@ -51,6 +59,8 @@ export const CONFIG = Object.freeze({
     correo: 'info@contadoor.cl',
   }),
 
-  // Avisos push: fuera de la V1. Queda el lugar preparado (js/push.js y sw.js) pero apagado.
-  AVISOS_PUSH: false,
+  // Avisos push (MC-6). Se enciende SOLO con MC6A + MC6B instalados, la Edge mc-push-send desplegada y la clave PÚBLICA VAPID
+  // de MiContadoor (MC_VAPID_PUBLIC_KEY, la privada nunca sale de los secretos de Supabase). Nunca la clave del equipo (Gestoor).
+  AVISOS_PUSH: true,
+  VAPID_PUBLICA: 'BIbnKeL3WOsy5hMd64YhEkci3GVNZO_Zm5k5Cj-wPuXo7bg1FE18xQRDFlXOjQ8eHgidBzjxHXffJpt3PrT4AOQ',   // clave PÚBLICA VAPID de MiContadoor (base64url, 87 caracteres). Vacía = no se ofrece «Activar avisos».
 });
