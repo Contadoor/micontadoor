@@ -73,7 +73,7 @@ export function vPreIva(ctx) {
   else if (!d) cuerpo = vacio(I.calendario, 'Tu Pre-IVA aún no está publicado', 'Cuando tu analista publique la estimación del mes, la verás aquí con su estado.');
   else cuerpo = html`<div class="card"><div class="li centro">${icoPreIva}<div class="t"><b>IVA estimado de ${mesDe(d.periodo)}</b><span class="xs">Publicado por tu analista el ${fecha(d.publicado_at)}, ${hora(d.publicado_at)}</span></div></div>
       <div class="mid s32">${clp(d.estimado, { aprox: true })}</div><div class="sm mt8">Con lo que llegó al SII hasta el ${fecha(d.info_hasta)}. Se declara y paga hasta el ${fecha(d.vence)}.</div></div>
-    <div class="card"><h3 class="t15">Cómo se calcula</h3>${(d.calculo || []).map(paso)}<div class="total-l"><span>IVA estimado</span><span>${clp(d.estimado, { aprox: true })}</span></div></div>
+    <div class="card"><h3 class="t15">Cómo se calcula</h3>${(d.calculo || []).map(paso)}<div class="total-l"><span>Total estimado a pagar</span><span>${clp(d.estimado, { aprox: true })}</span></div></div>
     ${d.consejo ? html`<div class="nota"><b>Lo que te conviene saber</b><div class="cuerpo">${d.consejo}</div></div>` : ''}
     ${leyendaEstados}<p class="xs c">El monto final es el del F29 que te confirmamos en tu reporte.</p>`;
   return html`${sub('Pre-IVA', { chip: d ? chipEstadoProy(d.estado) : '' })}<div class="sec">${segProy('preiva')}${cuerpo}</div>`;

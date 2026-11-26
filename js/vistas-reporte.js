@@ -49,7 +49,7 @@ export function vInicio(ctx) {
       ['Sabe antes cuánto viene de IVA cada mes', 'Proyección de tu renta anual para llegar a abril preparado'], ctx.waMejora);
   } else if (piv || pre) {
     proy = html`<div class="kpis mb">
-      ${piv ? html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>Pre-IVA</b>${chipEstadoProy(piv.estado)}</div><div class="mid s21">${clp(piv.estimado, { aprox: true })}</div><div class="xs">IVA de ${mesDe(piv.periodo)} a hoy</div></button>` : html`<span></span>`}
+      ${piv ? html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>Pre-IVA</b>${chipEstadoProy(piv.estado)}</div><div class="mid s21">${clp(piv.estimado, { aprox: true })}</div><div class="xs">Estimado a fin de ${mesDe(piv.periodo)}</div></button>` : html`<span></span>`}
       ${pre ? html`<button type="button" class="card kpi-btn" data-ir="prerenta"><div class="hd"><b>Pre-Renta</b><span class="chip c-proy">Proyección</span></div><div class="mid s21">${clp(pre.impuesto, { aprox: true })}</div><div class="xs">Renta AT ${pre.anio_tributario}</div></button>` : ''}
     </div>`;
   }

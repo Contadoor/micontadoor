@@ -58,3 +58,14 @@ test('trabajos especiales: error de la RPC muestra un aviso, nunca datos', () =>
   const s = String(vTrabajos(c));
   assert.ok(s.includes('No pudimos cargar tus trabajos especiales') && !s.includes('TE-2026-041'));
 });
+
+test('MC-PREIVA (26-11): Pre-IVA del mes en curso con su total estimado (IVA + PPM) y la fecha de pago del mes siguiente', () => {
+  const c = ctx(demo.refs.rio);
+  const s = String(vPreIva(c));
+  assert.match(s, /IVA estimado de noviembre/);
+  assert.match(s, /Total estimado a pagar/);
+  assert.match(s, /897\.000/);
+  assert.match(s, /más PPM/);
+  assert.doesNotMatch(s, /a hoy/);
+  assert.match(String(vInicio(c)), /Estimado a fin de noviembre/);
+});
