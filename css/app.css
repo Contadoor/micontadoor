@@ -343,5 +343,13 @@ a.btn{color:#fff}
 .hd.mt8{margin-top:18px}
 .pasos-ios{margin:8px 0 8px 18px;padding:0;font-size:13.5px;line-height:1.5}
 .pasos-ios li{margin:2px 0}
+/* Guía de instalación en iPhone (26-11) */
+.guia-ios{margin:12px 14px;padding:14px 16px;border-radius:16px;border:1.5px solid #D9B8DA;background:#FBF6FC;color:var(--texto,#1f1022)}
+[data-tema="oscuro"] .guia-ios{background:#22102A;border-color:#4a2a52;color:#f3e9f5}
+.guia-ios-tit{font-weight:800;font-size:15px;margin-bottom:4px}
+.guia-ios .pasos-ios li{margin:6px 0}
+.ico-ios{width:18px;height:18px;vertical-align:-3px;color:#924893}
+[data-tema="oscuro"] .ico-ios{color:#C77BC9}
+.guia-ios-cerrar{margin-top:6px;width:auto;padding:6px 14px;font-size:13px}
 #avisos .xs svg{width:14px;height:14px;vertical-align:-2px;margin-right:2px}
 .correo-av{border-top:1px solid var(--borde)}
