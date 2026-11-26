@@ -1,11 +1,12 @@
 // MiContadoor · service worker. Cachea SOLO los archivos propios de la app (esqueleto). NUNCA datos:
 // · toda petición a otro origen (Supabase, fuentes, WhatsApp) pasa directo a la red, sin tocar la caché;
 // · dentro del propio sitio solo se guarda lo que está en la lista ESQUELETO, y se usa SOLO sin conexión (red primero).
-const VERSION = 'mc-v1.0.0-5';
+importScripts('/js/sw-avisos.js');                          // MC-6: validación pura del aviso (self.MC_AVISO)
+const VERSION = 'mc-v1.0.0-6';
 const ESQUELETO = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
-  '/js/app.js', '/js/api.js', '/js/config.js', '/js/datos.js', '/js/demo.js', '/js/iconos.js', '/js/push.js', '/js/util.js',
-  '/js/vistas-acceso.js', '/js/vistas-comunes.js', '/js/vistas-cuenta.js', '/js/vistas-reporte.js', '/js/vistas-impuestos.js',
+  '/js/app.js', '/js/api.js', '/js/config.js', '/js/datos.js', '/js/demo.js', '/js/iconos.js', '/js/push.js', '/js/sw-avisos.js', '/js/util.js',
+  '/js/vistas-acceso.js', '/js/vistas-avisos.js', '/js/vistas-comunes.js', '/js/vistas-cuenta.js', '/js/vistas-reporte.js', '/js/vistas-impuestos.js', '/js/vistas-apertura.js',
   '/img/contadoor_lockup_white.png', '/img/contadoor_lockup_glossy.png', '/img/icono-192.png', '/img/icono-512.png',
 ];
 
@@ -34,10 +35,23 @@ self.addEventListener('fetch', (e) => {
   }).catch(() => caches.match(url.pathname)));
 });
 
-// ── Avisos push: preparado, APAGADO en la V1 (MC-6). Al activarlo, el texto visible es siempre genérico. ──
-// self.addEventListener('push', (e) => {
-//   e.waitUntil(self.registration.showNotification('MiContadoor', {
-//     body: 'Tienes un aviso nuevo de Contadoor',      // nunca montos, RUT ni nombres en la pantalla bloqueada
-//     icon: '/img/icono-192.png', badge: '/img/icono-192.png', tag: 'mc', data: { ruta: '#/inicio' } }));
-// });
-// self.addEventListener('notificationclick', (e) => { e.notification.close(); e.waitUntil(self.clients.openWindow('/' + (e.notification.data?.ruta || ''))); });
+// ── MC-6 · Avisos push. Lo visible es SIEMPRE genérico o un texto fijo validado (sin montos, RUT ni nombres). ──
+// iOS exige mostrar una notificación por cada push recibido: si la carga no es válida, se muestra el texto genérico.
+self.addEventListener('push', (e) => {
+  let datos = null;
+  try { datos = e.data ? e.data.text() : null; } catch { datos = null; }
+  const a = self.MC_AVISO.avisoSeguro(datos);
+  e.waitUntil(self.registration.showNotification(a.titulo, {
+    body: a.cuerpo, icon: '/img/icono-192.png', badge: '/img/icono-192.png', tag: a.tag, renotify: false, data: { url: a.url },
+  }));
+});
+// Al tocar el aviso: si la app está abierta se enfoca y navega (mensaje a la app, que vuelve a validar la ruta); si no, se abre.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = self.MC_AVISO.urlSegura(e.notification.data?.url);
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ws) => {
+    const w = ws.find((x) => new URL(x.url).origin === self.location.origin);
+    if (w) { w.postMessage({ tipo: 'mc-abrir', url }); return w.focus(); }
+    return self.clients.openWindow(url);
+  }));
+});

@@ -430,3 +430,25 @@ export function normalizarIncorporacion(j) {
     pasos,
   };
 }
+
+// ── MC-6 · Novedades (mc.avisos(p_ref, p_limite) → { ok, no_leidos, avisos:[{id, evento, titulo, texto, ruta, creado_at, leido}] }) ──
+export const EVENTOS_AVISO = { reporte_listo: 'reporte', faltan_compras: 'reporte', iva_vence: 'reporte', pago_confirmado: 'pagos', tramite_avanzo: 'trabajos', cobranza: 'pagos' };   // R3: cobranza = pagos (solo con Mi cuenta)
+const RUTAS_AVISO = new Set(['inicio', 'reporte', 'cuenta', 'cuenta/pagado', 'trabajos', 'mas']);
+/**
+ * Fail-closed: solo eventos conocidos, rutas de la lista, ids enteros y textos acotados. Defensa en profundidad del permiso por vínculo:
+ * aunque el servidor ya filtra, sin Mi cuenta los avisos de pagos NO se muestran.
+ */
+export function normalizarAvisos(j, perm) {
+  if (!j || j.ok !== true || !Array.isArray(j.avisos)) return { noLeidos: 0, avisos: [], correo: { activo: false, disponible: false } };
+  const avisos = j.avisos
+    .filter((a) => a && Number.isInteger(a.id) && a.id > 0 && a.evento in EVENTOS_AVISO && (EVENTOS_AVISO[a.evento] !== 'pagos' || perm?.verMiCuenta === true))
+    .map((a) => ({
+      id: a.id, evento: a.evento, categoria: EVENTOS_AVISO[a.evento],
+      titulo: String(a.titulo ?? '').slice(0, 120), texto: String(a.texto ?? '').slice(0, 500),
+      ruta: RUTAS_AVISO.has(a.ruta) && (a.ruta.startsWith('cuenta') ? perm?.verMiCuenta === true : true) ? a.ruta : 'inicio',
+      creado_at: typeof a.creado_at === 'string' ? a.creado_at : null, leido: a.leido === true,
+    }));
+  // R2: preferencia de correo de la cuenta (solo booleanos; sin dato = no disponible, fail-closed).
+  const correo = { activo: j.correo?.activo === true, disponible: j.correo?.disponible === true };
+  return { noLeidos: avisos.filter((a) => !a.leido).length, avisos, correo };
+}

@@ -41,11 +41,20 @@ const CEL = [
   ['24_trabajos_usuario_adicional', '&empresa=1&rol=consulta', 'trabajos'],
   ['25_tu_iva_no_conectada', '&empresa=3', 'preiva'],
   ['21_activar_contrasena', '', 'activar'], ['22_recuperar', '', 'recuperar'], ['23_terminos', '&terminos=1', 'inicio'],
+  // MC-6 · Novedades y avisos (push SIMULADO en la demo con &avisos=…)
+  ['24_mc6_inicio_novedades', '&empresa=1', 'inicio', true], ['25_mc6_novedades_lista', '&empresa=1', 'novedades', true],
+  ['26_mc6_mas_avisos_activar', '&empresa=1', 'mas', true], ['27_mc6_mas_avisos_activos', '&empresa=1&avisos=activo', 'mas', true],
+  ['28_mc6_mas_avisos_iphone_instalar', '&empresa=1&avisos=ios', 'mas', true], ['29_mc6_mas_avisos_bloqueados', '&empresa=1&avisos=bloqueado', 'mas', true],
+  ['30_mc6_usuario_adicional_novedades', '&empresa=3', 'novedades', true], ['31_mc6_usuario_adicional_avisos', '&empresa=3', 'mas', true],
+  ['32_mc6_cumplimiento_faltan_compras', '&empresa=2', 'inicio', true],
 ];
 const WEB = [['01_ingreso', '', 'ingreso'], ['02_inicio', '&empresa=1', 'inicio'], ['03_reporte_con_pendientes', '&empresa=2', 'reporte'],
   ['04_mi_cuenta', '&empresa=1', 'cuenta'], ['05_preiva_bloqueado', '&empresa=2', 'preiva']];
 
+// Opcional: CAPTURAS_SOLO='regex' toma solo las capturas cuyo nombre calza (p. ej. 'mc6' para las de MC-6).
+const SOLO = process.env.CAPTURAS_SOLO ? new RegExp(process.env.CAPTURAS_SOLO) : null;
 async function foto(nombre, ancho, alto, movil, url, completa, oscuro) {
+  if (SOLO && !SOLO.test(nombre)) return;
   await cmd('Emulation.setDeviceMetricsOverride', { width: ancho, height: alto, deviceScaleFactor: movil ? 2 : 1, mobile: movil });
   await cmd('Emulation.setTouchEmulationEnabled', movil ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
   await cmd('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: oscuro ? 'dark' : 'light' }] });

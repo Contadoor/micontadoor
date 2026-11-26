@@ -4,6 +4,7 @@ import { I, icoPreIva, icoMiRenta } from './iconos.js';
 import { datosDe, saldoFavorTexto, planTexto } from './datos.js';
 import { sub, teaser, vacio, paso, waCard, chipEstadoProy, leyendaEstados, botonSolicitud } from './vistas-comunes.js';
 import { bloqueTerminosAceptados, DIAGNOSTICO_NOMBRE } from './vistas-apertura.js';
+import { tarjetaAvisos } from './vistas-avisos.js';
 
 const CHIP_VENCE = { por_vencer: 'c-pend', vencida: 'c-venc' };
 
@@ -132,6 +133,7 @@ export function vMas(ctx) {
       ${ctx.api?.capacidades?.historialImpuestos ? html`<div class="li centro"><span class="ic i-m">${I.calendario}</span><div class="t"><b>Mis impuestos · historial</b><span class="sm">Tu año mes a mes</span></div><button type="button" class="btn lin auto" data-ir="impuestos-historial">Abrir</button></div>` : ''}
       <div class="li centro"><span class="ic i-v">${I.ayuda}</span><div class="t"><b>Ayuda</b><span class="sm">WhatsApp, correo y tus solicitudes</span></div><button type="button" class="btn lin auto" data-ir="ayuda">Abrir</button></div>
     </div>
+    ${tarjetaAvisos(ctx)}
     <div class="card miplan"><div class="hd"><h3>Mi plan</h3><span class="chip c-conc">${planTexto(ctx.resumen?.plan_nivel, ctx.resumen?.plan_nombre)}</span></div>
       <div class="fila"><div class="t"><b>✓ Reporte mensual e historial</b></div></div>
       ${ctx.perm.verMiCuenta ? html`<div class="fila"><div class="t"><b>✓ Mi cuenta: por pagar y pagado</b></div></div>` : ''}
