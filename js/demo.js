@@ -13,15 +13,17 @@ const EMPRESAS = [
   { ref: REF.alerce, razon_social: 'Inversiones Alerce SpA', rut: '76.000.003-6', rol: 'consulta', plan_nivel: 'pro' },
 ];
 
-const PREIVA = {
+const PREIVA = {   // misma forma que mc._preiva_mes_en_curso (MC-PREIVA 26-11): Pre-IVA del MES EN CURSO, publicado al marcarlo enviado
   periodo: '2026-11', estado: 'preliminar', publicado_at: '2026-11-12T21:30:00Z', info_hasta: '2026-11-11', vence: '2026-12-21',
-  estimado: 702000,
+  estimado: 897000,
   calculo: [
-    { t: 'IVA de tus ventas', xs: '19 % de $6.100.000 · 31 documentos', monto: 1159000 },
-    { t: 'menos IVA de tus compras', xs: '19 % de $2.405.000 · 14 documentos', monto: -457000 },
+    { t: 'IVA de tus ventas a la fecha', xs: '31 documentos', monto: 1159000 },
+    { t: 'menos IVA de tus compras a la fecha', xs: '14 documentos', monto: -457000 },
     { t: 'menos remanente de octubre', monto: 0, resta: true },
+    { t: 'IVA a pagar estimado al cierre del mes', xs: 'Proyectamos los días que faltan con tu promedio diario', monto: 702000 },
+    { t: 'más PPM (pago provisional mensual)', xs: 'Tasa 1,5 % sobre tus ventas', monto: 195000 },
   ],
-  consejo: '2 facturas de compra aún no llegan. Si llegan antes del cierre, tu IVA baja ≈ $58.900.',
+  consejo: '2 facturas de compra están pendientes en el SII. No rebajan tu IVA hasta que se acepten; si se aceptan antes del cierre del mes, tu IVA baja.',
 };
 const PRERENTA = {
   anio_tributario: 2027, estado: 'preliminar', publicado_at: '2026-11-10T19:00:00Z',
