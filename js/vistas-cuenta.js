@@ -131,7 +131,7 @@ export function vMas(ctx) {
       <div class="li centro"><span class="ic i-a">${I.persona}</span><div class="t"><b>Mi acceso</b><span class="sm">Empresas, contraseña, cerrar sesión</span></div><button type="button" class="btn lin auto" data-ir="acceso">Abrir</button></div>
       ${ctx.incorporacion?.estado === 'ok' && ctx.incorporacion.disponible ? html`<div class="li centro"><span class="ic i-i">${I.ruta}</span><div class="t"><b>Tu incorporación</b><span class="sm">Tus pasos y ${DIAGNOSTICO_NOMBRE}</span></div><button type="button" class="btn lin auto" data-ir="incorporacion">Abrir</button></div>` : ''}
       ${ctx.api?.capacidades?.historialImpuestos ? html`<div class="li centro"><span class="ic i-m">${I.calendario}</span><div class="t"><b>Mis impuestos · historial</b><span class="sm">Tu año mes a mes</span></div><button type="button" class="btn lin auto" data-ir="impuestos-historial">Abrir</button></div>` : ''}
-      <div class="li centro"><span class="ic i-v">${I.ayuda}</span><div class="t"><b>Ayuda</b><span class="sm">WhatsApp, correo y tus solicitudes</span></div><button type="button" class="btn lin auto" data-ir="ayuda">Abrir</button></div>
+      <div class="li centro"><span class="ic i-v">${I.ayuda}</span><div class="t"><b>Ayuda</b><span class="sm">Correo y tus solicitudes</span></div><button type="button" class="btn lin auto" data-ir="ayuda">Abrir</button></div>
     </div>
     ${tarjetaAvisos(ctx)}
     <div class="card miplan"><div class="hd"><h3>Mi plan</h3><span class="chip c-conc">${planTexto(ctx.resumen?.plan_nivel, ctx.resumen?.plan_nombre)}</span></div>

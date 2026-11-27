@@ -82,7 +82,13 @@ export function paso(p) {
   return html`<div class="paso"><div><b>${p.t}</b>${p.xs ? html`<span class="xs">${p.xs}</span>` : ''}</div><b>${v}</b></div>`;
 }
 
-export function waCard(enlace) {
+// Luciano 27-11: casi todos los clientes tienen su GRUPO de WhatsApp con Contadoor y el portal no puede abrir ese grupo
+// (solo un número fijo). Para no mandarlos a un número equivocado, la tarjeta «Tu equipo Contadoor · WhatsApp» no se muestra.
+// Se deja la función (vacía) para no tocar cada vista; para reactivarla, devolver la tarjeta de abajo.
+export function waCard(_enlace) {
+  return '';
+}
+export function waCardAnterior(enlace) {
   return html`<div class="card wa-card"><span class="ic i-v">${I.chat}</span>
     <div class="t"><b>Tu equipo Contadoor</b><div class="xs">Te respondemos en horario hábil</div></div>
     <a class="wa" href="${enlace}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div>`;

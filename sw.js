@@ -2,7 +2,7 @@
 // · toda petición a otro origen (Supabase, fuentes, WhatsApp) pasa directo a la red, sin tocar la caché;
 // · dentro del propio sitio solo se guarda lo que está en la lista ESQUELETO, y se usa SOLO sin conexión (red primero).
 importScripts('/js/sw-avisos.js');                          // MC-6: validación pura del aviso (self.MC_AVISO)
-const VERSION = 'mc-v1.0.0-9';
+const VERSION = 'mc-v1.0.0-10';
 const ESQUELETO = [
   '/', '/index.html', '/css/app.css', '/manifest.webmanifest',
   '/js/app.js', '/js/api.js', '/js/config.js', '/js/datos.js', '/js/demo.js', '/js/iconos.js', '/js/push.js', '/js/sw-avisos.js', '/js/util.js',
