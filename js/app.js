@@ -29,6 +29,8 @@ const st = {
   avisos: null, pushEstado: 'apagado',     // MC-6: Novedades de la empresa elegida y estado del push en este aparato
 };
 const ERR_CORTE = ['MC_SESION_INVALIDA', 'MC_BLOQUEADO'];
+/** 'AAAA-MM' del mes en curso en hora de Chile. */
+function mesEnCursoChile(d = new Date()) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit' }).format(d).slice(0, 7); }
 
 // ── Tema: Claro / Oscuro / Automático (se recuerda en el aparato) ─────────────────────────────────────────────────
 const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
@@ -226,7 +228,9 @@ async function cargarResumen() {
   const pm = permisos(r);
   let imp = null;
   if (st.api.impuestos && pm.preIva !== 'sin_permiso') {   // Luciano 19-11: el plan Cumplimiento también ve su IVA del mes
-    try { const j = await st.api.impuestos(st.empresa.ref); imp = j ? normalizarImpuestos(j) : null; }
+    // Luciano 27-11: Proyecciones muestra el Pre-IVA del MES EN CURSO (el que se paga el mes siguiente), nunca el mes anterior,
+    // que ya está en el Reporte. mc.mis_impuestos acepta el mes en curso (hora de Chile) y lo devuelve como «Pre-IVA · estimado».
+    try { const j = await st.api.impuestos(st.empresa.ref, mesEnCursoChile()); imp = j ? normalizarImpuestos(j) : null; }
     catch (e) { if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) throw e; imp = { estado: 'error' }; }
   }
   st.impuestos = imp;

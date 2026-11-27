@@ -23,7 +23,7 @@ const pct = (t) => (t === null || t === undefined ? '' : String(t).replace('.', 
 const hoyChile = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
 
 function seg(actual) {
-  return html`<div class="seg" role="group" aria-label="Proyecciones"><button type="button" data-ir="preiva" class="${actual === 'preiva' ? 'on' : ''}" aria-pressed="${actual === 'preiva'}">Tu IVA</button><button type="button" data-ir="prerenta" class="${actual === 'prerenta' ? 'on' : ''}" aria-pressed="${actual === 'prerenta'}">Pre-Renta</button></div>`;
+  return html`<div class="seg" role="group" aria-label="Proyecciones"><button type="button" data-ir="preiva" class="${actual === 'preiva' ? 'on' : ''}" aria-pressed="${actual === 'preiva'}">Pre-IVA</button><button type="button" data-ir="prerenta" class="${actual === 'prerenta' ? 'on' : ''}" aria-pressed="${actual === 'prerenta'}">Pre-Renta</button></div>`;
 }
 
 function linea(t, xs, v, clase = '') {
