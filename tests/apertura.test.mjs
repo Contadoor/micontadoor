@@ -134,9 +134,9 @@ const ctxBase = (extra = {}) => {
 };
 test('Ayuda: formulario solo con soporte configurado; solicitudes y textos escapados', () => {
   const s = String(vAyuda(ctxBase(), { soporte: true, solicitudes: [{ folio: 'MC-2026-00001', tipo: 'datos', estado: 'en_curso', creada_at: '2026-11-20T12:00:00Z' }], texto: MALO, mensaje: MALO }));
-  assert.ok(limpio(s) && s.includes('data-form="soporte"') && s.includes('MC-2026-00001') && s.includes('En revisión') && s.includes('info@contadoor.cl') && s.includes('https://wa.me/2'));
+  assert.ok(limpio(s) && s.includes('data-form="soporte"') && s.includes('MC-2026-00001') && s.includes('En revisión') && s.includes('info@contadoor.cl') && !s.includes('https://wa.me/2'));
   const sin = String(vAyuda(ctxBase(), { soporte: false }));
-  assert.ok(!sin.includes('data-form="soporte"') && sin.includes('https://wa.me/2') && sin.includes('Cerrar sesión en todos mis aparatos'));
+  assert.ok(!sin.includes('data-form="soporte"') && !sin.includes('https://wa.me/2') && sin.includes('Cerrar sesión en todos mis aparatos'));
   const fol = String(vAyuda(ctxBase(), { soporte: true, enviada: true, folio: 'MC-2026-00012', solicitudes: [] }));
   assert.ok(fol.includes('Tu número de solicitud es <b>MC-2026-00012</b>'));
   assert.ok(String(vAyuda(ctxBase(), { soporte: true, tipo: 'seguridad', solicitudes: [] })).includes('value="seguridad" selected'));
