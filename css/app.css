@@ -403,3 +403,7 @@ b.rojo{color:#E07A6E}
 .check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin-top:10px}
 .check input{margin-top:3px}
 .campos label.check{flex-direction:row;font-weight:500;color:inherit}
+.con-ic{display:flex;align-items:center;gap:10px}
+.con-ic .ic{width:34px;height:34px;border-radius:10px}.con-ic .ic svg{width:18px;height:18px}
+.btn-ic{display:inline-flex;vertical-align:-4px;margin-right:8px}.btn-ic svg{width:18px;height:18px}
+.con-ic-xs{display:flex;align-items:center;gap:2px}.con-ic-xs .btn-ic{margin-right:4px}.con-ic-xs .btn-ic svg{width:15px;height:15px}

@@ -8,6 +8,8 @@ export const I = {
   grafico: s('<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>'),
   check: s('<path d="M20 6 9 17l-5-5"/>', 2.2),
   checkG: s('<path d="M20 6 9 17l-5-5"/>', 2.4),
+  agenda: s('<rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 3v3M16 3v3"/><path d="M8 14h3M8 17.5h6"/>'),
+  reunion: s('<rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="m15.5 10.5 6-3.5v10l-6-3.5z"/>'),
   calendario: s('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 16l3-2 2 1 3-3"/>'),
   llave: s('<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>'),
   tarjeta: s('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>'),
