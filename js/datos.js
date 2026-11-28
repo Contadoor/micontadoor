@@ -315,7 +315,7 @@ export function normalizarCumplimiento(u) {
   if (!u || typeof u !== 'object' || u.disponible !== true || typeof u.cumple !== 'boolean') return { disponible: false };
   const condiciones = (Array.isArray(u.condiciones) ? u.condiciones : []).filter((x) => x && texto(x.titulo, 160)).slice(0, 10)
     .map((x) => ({ titulo: texto(x.titulo, 160), cumple: typeof x.cumple === 'boolean' ? x.cumple : null }));
-  return { disponible: true, cumple: u.cumple, estado: texto(u.estado, 120), condiciones };
+  return { disponible: true, cumple: u.cumple, estado: texto(u.estado, 120), condiciones, actualizado: fechaOk(String(u.actualizado_en || '').slice(0, 10)) };
 }
 
 /** Monto principal: el del reporte validado; si no, el Pre-IVA enviado por el analista; si no, el cálculo con datos del SII (null = «Por confirmar»). */

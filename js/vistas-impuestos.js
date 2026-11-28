@@ -153,6 +153,28 @@ export function vImpuestos(ctx, n) {
 }
 
 /** Tarjeta del Inicio con el total del mes (solo con datos del SII). */
+/** Luciano 27-11: «Tu situación tributaria» SIEMPRE visible en el Inicio (no solo cuando hay un problema).
+ *  Resume lo que ya trae mc.mis_impuestos: cumplimiento ante el SII, F29, F22 y cartas. Fail-closed: sin datos, no se muestra. */
+export function tarjetaSituacion(n) {
+  if (!n || n.estado !== 'ok' || !n.obs) return '';
+  const cu = n.obs.cumplimiento || { disponible: false }; const ca = n.obs.cartas || { disponible: false, items: [] };
+  const it = n.obs.items || [];
+  const f29 = it.filter((x) => String(x.tipo || '').startsWith('f29_')).length; const f22 = it.filter((x) => x.tipo === 'f22_observacion').length;
+  if (!cu.disponible && !ca.disponible && !it.length) return '';
+  const fila = (ok, t, xs) => html`<div class="li"><span class="ic ${ok === null ? 'i-m' : ok ? 'i-v' : 'i-n'}" aria-hidden="true">${ok === null ? '·' : ok ? '✓' : '!'}</span><div class="t"><b>${t}</b><span class="sm">${xs}</span></div></div>`;
+  const filas = [
+    cu.disponible ? fila(cu.cumple, 'Cumplimiento tributario (SII)', cu.cumple ? 'Cumple sus obligaciones tributarias' : 'Hay condiciones por regularizar') : fila(null, 'Cumplimiento tributario (SII)', 'Aún sin consulta al SII'),
+    fila(!f29, 'Declaraciones de IVA (F29)', f29 ? (f29 === 1 ? '1 mes requiere revisión' : f29 + ' meses requieren revisión') : 'Sin observaciones'),
+    fila(!f22, 'Declaración de renta (F22)', f22 ? 'Tiene observaciones del SII' : 'Sin observaciones'),
+    ca.disponible ? fila(!ca.total, 'Cartas y notificaciones', ca.total ? (ca.total === 1 ? '1 en los últimos 12 meses' : ca.total + ' en los últimos 12 meses') : 'Ninguna en los últimos 12 meses') : fila(null, 'Cartas y notificaciones', 'Aún sin leer del SII'),
+  ];
+  const alerta = (cu.disponible && !cu.cumple) || f29 > 0 || f22 > 0 || (ca.disponible && ca.items.some((x) => x.nueva));
+  return html`<div class="card situ"><div class="hd"><h3>Tu situación tributaria</h3><span class="chip ${alerta ? 'c-pend' : 'c-ok'}">${alerta ? 'Requiere atención' : 'Al día ✓'}</span></div>
+    ${filas}
+    <div class="xs mt8">${cu.actualizado ? 'Consultado en el SII el ' + fecha(cu.actualizado, { anio: true }) + '. ' : ''}${alerta ? 'Tu analista ya lo está revisando.' : 'No necesitas hacer nada.'}</div>
+    <button type="button" class="btn lin" data-ir="preiva">Ver el detalle</button></div>`;
+}
+
 export function kpiImpuestos(n) {
   if (!n || n.estado !== 'ok') return '';
   const t = totalMostrado(n); const v = validado(n);
