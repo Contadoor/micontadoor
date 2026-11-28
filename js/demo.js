@@ -339,6 +339,55 @@ export const demo = {
     for (const a of AVISOS[ref] || []) if (ids === null || ids.includes(a.id)) leidos.add(a.id);
     return { ok: true };
   },
+  /** ASESORÍAS AL DÍA en memoria (forma de mc.mis_reuniones). Río: plan PRO (1 por trimestre) con una reunión pasada con minuta. Cifras FICTICIAS. */
+  _reu: null,
+  _reuBase() {
+    if (this._reu) return this._reu;
+    const iso = (d, h) => new Date(Date.UTC(2026, 10, d, h + 3, h === 10 ? 30 : 30)).toISOString();
+    this._reu = { seq: 10, lista: [{ id: 1, tema: 'contable', estado: 'cerrada', inicio: iso(12, 10), fin: iso(12, 11).replace(':30:', ':00:'), motivo: 'Revisar el PPM y la proyección de renta', pagada: false, precio: null,
+      con: { nombre: 'Leticia Romero' }, meet_url: null, puede_cancelar: false,
+      minuta: { resumen: 'Revisamos el PPM del año: va por sobre lo necesario. Acordamos bajar la tasa y preparar la renta con tiempo.', seguimiento: 'Revisamos de nuevo en diciembre con el cierre de noviembre.', proxima: 'Diciembre, después del día 20',
+        acuerdos: [{ descripcion: 'Enviar las facturas de compra de octubre que faltan', quien: 'Tú', vence: '2026-12-05', estado: 'pendiente' },
+                   { descripcion: 'Solicitar al SII la rebaja de la tasa de PPM', quien: 'Leticia Romero', vence: '2026-12-10', estado: 'pendiente' }] } }] };
+    return this._reu;
+  },
+  reuniones(ref) {
+    if (!EMPRESAS.some((e) => e.ref === ref)) return null;
+    const b = this._reuBase(); const usadas = b.lista.filter((r) => !r.pagada && ['solicitada', 'confirmada', 'realizada', 'cerrada'].includes(r.estado) && r.inicio >= '2026-10-01').length;
+    const vivas = (r) => ['solicitada', 'confirmada'].includes(r.estado) && Date.parse(r.fin) > Date.now();
+    return { ok: true, ref, cupo: { plan: 'asesoria', n: 1, cada_meses: 3, desde: '2026-10-01', hasta: '2026-12-31', usadas, disponibles: Math.max(1 - usadas, 0), precio_pagada: 35000 },
+      temas: [{ tema: 'estrategico', disponible: true, con: { nombre: 'Luciano Duarte' } }, { tema: 'contable', disponible: true, con: { nombre: 'Leticia Romero' } }, { tema: 'rrhh', disponible: true, con: { nombre: 'Daniela Cáceres' } }],
+      proximas: b.lista.filter(vivas).sort((x, y) => x.inicio.localeCompare(y.inicio)), historial: b.lista.filter((r) => !vivas(r)),
+      acuerdos_abiertos: b.lista.flatMap((r) => (r.minuta?.acuerdos || []).filter((g) => g.estado === 'pendiente').map((g, i) => ({ id: r.id * 100 + i, ...g, vencido: false }))) };
+  },
+  reunionHorarios(ref, tema) {
+    const r = this.reuniones(ref); const incl = r.cupo.disponibles > 0; const out = [];
+    const base = new Date(); base.setUTCHours(12, 0, 0, 0);
+    for (let k = 3; out.length < 12 && k < 30; k++) {
+      const d = new Date(base.getTime() + k * 864e5); const dow = d.getUTCDay();
+      if (dow === 0 || dow === 6 || (tema !== 'estrategico' && ![2, 3, 4].includes(dow))) continue;
+      for (const [h, m] of incl ? [[13, 30], [14, 25], [19, 30], [20, 25]] : [[13, 30], [19, 30]]) {
+        const i = new Date(d); i.setUTCHours(h, m, 0, 0); const f = new Date(i.getTime() + (incl ? 40 : 60) * 6e4);
+        out.push({ inicio: i.toISOString(), fin: f.toISOString(), incluida: incl });
+      }
+    }
+    return { ok: true, tema, horarios: out };
+  },
+  reunionSolicitar(ref, tema, inicio, motivo, pagada) {
+    const h = this.reunionHorarios(ref, tema).horarios.find((x) => x.inicio === inicio);
+    if (!h) return { ok: false, codigo: 'ASE_HORA_NO_DISPONIBLE' };
+    if (String(motivo || '').trim().length < 5) return { ok: false, codigo: 'ASE_MOTIVO' };
+    if (!h.incluida && !pagada) return { ok: false, codigo: 'ASE_SIN_CUPO' };
+    const b = this._reuBase(); const id = ++b.seq;
+    const con = { estrategico: 'Luciano Duarte', contable: 'Leticia Romero', rrhh: 'Daniela Cáceres' }[tema];
+    b.lista.push({ id, tema, estado: 'solicitada', inicio: h.inicio, fin: h.fin, motivo: String(motivo).trim(), pagada: !h.incluida, precio: h.incluida ? null : 35000, con: { nombre: con }, meet_url: null, puede_cancelar: true, minuta: null });
+    return { ok: true, id };
+  },
+  reunionCancelar(ref, id) {
+    const r = this._reuBase().lista.find((x) => x.id === id && x.puede_cancelar);
+    if (!r) return { ok: false, codigo: 'ASE_NO_CANCELABLE' };
+    r.estado = 'cancelada'; r.puede_cancelar = false; return { ok: true, id };
+  },
   /** Igual que mc.mis_convenios. Río: un convenio TGR activo (cifras FICTICIAS); el resto, sin convenios. */
   convenios(ref) {
     if (!EMPRESAS.some((e) => e.ref === ref)) return null;
