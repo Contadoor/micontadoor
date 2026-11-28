@@ -614,3 +614,21 @@ export function normalizarImpuestosAnio(j) {
       meses_f29: Number.isInteger(t.meses_con_f29) ? t.meses_con_f29 : meses.filter((x) => x.f29.montos).length },
   };
 }
+
+// MC-CONV-1 · contrato mc.mis_convenios(p_ref) → { ok, ref, convenios:[{ id, tipo:'TGR'|'SII'|'Otro', numero, deuda, estado:'activo'|'terminado',
+//   monto_total, monto_cuota, n_cuotas, fecha_inicio, fecha_termino, pagadas, saldo, cuotas:[{numero, monto, vence, estado:'pagada'|'pendiente'|'vencida'}] }] }
+const TIPOS_CONV = { TGR: 'Tesorería (TGR)', SII: 'SII', Otro: 'Convenio' };
+const EST_CUOTA = new Set(['pagada', 'pendiente', 'vencida']);
+export function normalizarConvenios(j) {
+  if (!j || j.ok !== true || !Array.isArray(j.convenios)) return { estado: 'error' };
+  const lista = j.convenios.filter((c) => c && typeof c === 'object').slice(0, 20).map((c) => {
+    const cuotas = (Array.isArray(c.cuotas) ? c.cuotas : []).filter((q) => q && Number.isInteger(q.numero) && EST_CUOTA.has(q.estado)).slice(0, 120)
+      .map((q) => ({ numero: q.numero, monto: pesos(q.monto), vence: fechaOk(q.vence), estado: q.estado }));
+    const prox = cuotas.find((q) => q.estado !== 'pagada') || null;
+    return { tipo: TIPOS_CONV[c.tipo] ? c.tipo : 'Otro', tipoTxt: TIPOS_CONV[c.tipo] || TIPOS_CONV.Otro, numero: texto(c.numero, 40), deuda: texto(c.deuda, 160),
+      activo: c.estado === 'activo', total: pesos(c.monto_total), cuota: pesos(c.monto_cuota), n: Number.isInteger(c.n_cuotas) ? c.n_cuotas : cuotas.length,
+      pagadas: Number.isInteger(c.pagadas) ? c.pagadas : cuotas.filter((q) => q.estado === 'pagada').length, saldo: pesos(c.saldo),
+      vencidas: cuotas.filter((q) => q.estado === 'vencida').length, prox, cuotas };
+  });
+  return { estado: 'ok', lista, activos: lista.filter((c) => c.activo) };
+}

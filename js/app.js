@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarImpuestosAnio, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte, normalizarAvisos } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarImpuestosAnio, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, normalizarConvenios, validarSoporte, normalizarAvisos } from './datos.js';
 import { html, urlSegura, CORREO, sha256Hex, UUID } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
@@ -10,6 +10,7 @@ import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
 import { vImpuestos } from './vistas-impuestos.js';
 import { vAnio } from './vistas-anio.js';
+import { vConvenios } from './vistas-convenios.js';
 import { vTerminosServidor, vAyuda, vIncorporacion, hojaTerminos } from './vistas-apertura.js';
 import { registrarServiceWorker, estadoActual, activarAvisos, desactivarAvisos } from './push.js';
 import { vNovedades } from './vistas-avisos.js';
@@ -81,7 +82,7 @@ function ctx() {
     abiertos: st.abiertos, solicitudes: st.solicitudes, waMejora: WA_MEJORA, waEquipo: WA_EQUIPO, waAyuda: WA_AYUDA,
     incorporacion: st.incorporacion, misTerminos: st.cache.misTerminos,
     enlaceDoc: (u) => urlSegura(u, CONFIG.HOSTS_DOCUMENTOS),
-    avisos: st.avisos, pushEstado: st.pushEstado,
+    avisos: st.avisos, pushEstado: st.pushEstado, convenios: st.convenios,
     anualOk: anualDisponible(), anioPedido: st.anual?.anio ?? null,
   };
 }
@@ -102,6 +103,7 @@ function vista(r, a) {
     }
     case 'prerenta': return vPreRenta(c);
     case 'trabajos': return vTrabajos(c);
+    case 'convenios': return vConvenios(c, st.convenios);
     case 'mas': return vMas(c);
     case 'acceso': return vAcceso(c);
     case 'ayuda': return vAyuda(c, { ...st.ayuda, soporte: !!st.api.capacidades.soporte, solicitudes: st.cache.solicitudes });
@@ -262,6 +264,13 @@ async function cargarResumen() {
     catch (e) { if (ERR_CORTE.includes(e?.codigo)) throw e; inc = { estado: 'error' }; }
   }
   st.incorporacion = inc;
+  // MC-CONV-1 «Tus convenios» (mc.mis_convenios): si falla, aviso neutro en su vista; nunca cuotas inventadas.
+  let conv = null;
+  if (st.api.capacidades.convenios && st.api.convenios) {
+    try { const j = await st.api.convenios(st.empresa.ref); conv = j ? normalizarConvenios(j) : null; }
+    catch (e) { if (ERR_CORTE.includes(e?.codigo)) throw e; conv = { estado: 'error' }; }
+  }
+  st.convenios = conv;
   delete st.cache.solicitudes; st.ayuda = {};
   st.resumen = r;
   st.perm = permisos(st.resumen);

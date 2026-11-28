@@ -30,6 +30,7 @@ export const CONFIG = Object.freeze({
     TERMINOS_TEXTO: 'terminos_texto',           // texto exacto de una versión aceptada
     SOPORTE_CREAR: 'soporte_crear',             // «Cuéntanos qué pasa» → folio MC-AAAA-NNNNN
     MIS_SOLICITUDES: 'mis_solicitudes',         // «Tus solicitudes»
+    MIS_CONVENIOS: 'mis_convenios',              // «Tus convenios» con la Tesorería / SII (MC-CONV-1, 28-11)
     INCORPORACION: 'mi_incorporacion',          // «Tu incorporación» (ONBOARDING-V2)
     DIAGNOSTICO: null,                          // «Tu diagnóstico "Aquí partimos"»: aún sin informe ni RPC (espacio listo)
     HISTORIAL_IMPUESTOS: 'mis_impuestos_anio',  // «Tu año con el SII» (mc.mis_impuestos_anio, instalada 24-11): año actual y anterior, con gráficos

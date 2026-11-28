@@ -339,6 +339,14 @@ export const demo = {
     for (const a of AVISOS[ref] || []) if (ids === null || ids.includes(a.id)) leidos.add(a.id);
     return { ok: true };
   },
+  /** Igual que mc.mis_convenios. Río: un convenio TGR activo (cifras FICTICIAS); el resto, sin convenios. */
+  convenios(ref) {
+    if (!EMPRESAS.some((e) => e.ref === ref)) return null;
+    if (ref !== REF.rio) return { ok: true, ref, convenios: [] };
+    const cuotas = Array.from({ length: 12 }, (_, i) => ({ numero: i + 1, monto: 85400, vence: `${i < 11 ? 2026 : 2027}-${String(((i + 5) % 12) + 1).padStart(2, '0')}-28`, estado: i < 6 ? 'pagada' : i === 6 ? 'vencida' : 'pendiente' }));
+    return { ok: true, ref, convenios: [{ id: 1, tipo: 'TGR', numero: '1234567', deuda: 'IVA de marzo y abril 2026', estado: 'activo', monto_total: 1024800, monto_cuota: 85400, n_cuotas: 12,
+      fecha_inicio: '2026-05-28', fecha_termino: '2027-04-28', pagadas: 6, saldo: 512400, cuotas }] };
+  },
   incorporacion(ref, opciones = {}) { return EMPRESAS.some((e) => e.ref === ref) ? incorporacionDe(ref, opciones) : null; },
   async terminosVigentes(opciones = {}) {
     const sha = await sha256Hex(TERMINOS_V1_TEXTO);
