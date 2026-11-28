@@ -298,7 +298,7 @@ export function normalizarImpuestos(j) {
                    codigo: texto(x.codigo, 20), texto: texto(x.texto, 200) }));
   return {
     estado: 'ok', periodo, vence, datos_al: fechaOk(j.datos_al), cobertura_completa: j.cobertura_completa === true,
-    est, oficial: of, preiva, estado_iva: estadoIva, f29, obs: { items, cartas: normalizarCartas(j.observaciones?.cartas), cumplimiento: normalizarCumplimiento(j.observaciones?.cumplimiento) },
+    est, oficial: of, preiva, estado_iva: estadoIva, f29, obs: { items, cartas: normalizarCartas(j.observaciones?.cartas), cumplimiento: normalizarCumplimiento(j.observaciones?.cumplimiento), f22: normalizarF22(j.observaciones?.f22_estado) },
   };
 }
 
@@ -310,6 +310,22 @@ export function normalizarCartas(c) {
     .map((x) => ({ categoria: x.categoria, titulo: texto(x.titulo, 200), fecha: fechaOk(x.fecha), remitente: texto(x.remitente, 120), plazo: texto(x.plazo, 120), nueva: x.nueva === true }));
   const total = Number.isInteger(c.total_12_meses) && c.total_12_meses >= items.length ? c.total_12_meses : items.length;
   return { disponible: true, total, items };
+}
+/** MC-F22-1 (Luciano 28-11): estado REAL del F22. Si el servidor no lo entrega (versión anterior), null → la vista usa la lógica de antes.
+ *  nivel: 'falta' (hay años anteriores pero no el que corresponde) · 'alerta' (el SII informa inconsistencias, retención, cobro, citación…)
+ *  · 'ok' (sin diferencias / aceptada / devolución autorizada) · 'sin' (nunca ha declarado: p. ej. empresa nueva) · 'neutro' (texto no reconocido). */
+const F22_ALERTA = /persisten inconsistencias|se detectaron|deber[aá] solucionar|retuvo|retenid|citaci|fiscalizaci|cobro|diferencia no pagada|en proceso de revisi/i;
+const F22_OK = /no presenta diferencias|autoriz[oó] a la tesorer|ha sido aceptada|fue(?:ron)? justificadas|rectificatoria/i;
+export function normalizarF22(f) {
+  if (!f || typeof f !== 'object' || f.disponible !== true || !Number.isInteger(f.at_esperado)) return null;
+  const txt = texto(f.texto, 400); const atU = Number.isInteger(f.at_ultimo) ? f.at_ultimo : null;
+  let nivel;
+  if (f.hay_declaraciones !== true) nivel = 'sin';
+  else if (f.declarado_esperado !== true) nivel = 'falta';
+  else if (txt && F22_ALERTA.test(txt)) nivel = 'alerta';
+  else if (txt && F22_OK.test(txt)) nivel = 'ok';
+  else nivel = txt ? 'neutro' : 'ok';
+  return { nivel, at_esperado: f.at_esperado, at_ultimo: atU, texto: txt, alerta_anterior: f.declarado_esperado !== true && !!txt && F22_ALERTA.test(txt) };
 }
 export function normalizarCumplimiento(u) {
   if (!u || typeof u !== 'object' || u.disponible !== true || typeof u.cumple !== 'boolean') return { disponible: false };
