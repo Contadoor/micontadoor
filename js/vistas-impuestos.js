@@ -80,6 +80,21 @@ function recomendaciones(n) {
     <div class="xs mt8">Ordenadas por impacto en pesos. Son orientaciones con tus datos del SII, no montos definitivos.</div></div>`;
 }
 
+/** Línea del F22 con el estado real (MC-F22-1). f22obs = observaciones de la lista del SII (si las hay, se muestran). */
+function filaF22(fe, f22obs) {
+  const ic = (k) => (k === 'ok' ? ['i-v', '✓'] : k === 'sin' || k === 'neutro' ? ['i-m', '·'] : ['i-n', '!']);
+  const k = f22obs.length && fe.nivel === 'ok' ? 'alerta' : fe.nivel; const [c, s] = ic(k);
+  const t = k === 'falta' ? `No figura tu declaración de renta del AT ${fe.at_esperado}` : k === 'sin' ? 'Declaración de renta (F22)'
+    : `Tu declaración de renta (AT ${fe.at_ultimo || fe.at_esperado})`;
+  const xs = k === 'falta' ? `El SII no registra el F22 del AT ${fe.at_esperado}.${fe.at_ultimo ? ' La última que registra es la del AT ' + fe.at_ultimo + '.' : ''}`
+    : k === 'sin' ? 'El SII no registra declaraciones de renta para esta empresa.' : k === 'ok' && !fe.texto ? html`<span class="ok-txt">Sin observaciones ✓</span>` : '';
+  return html`<div class="li"><span class="ic ${c}" aria-hidden="true">${s}</span><div class="t"><b>${t}</b>
+    ${xs ? html`<span class="sm">${xs}</span>` : ''}
+    ${fe.texto ? html`<span class="sm bloque">${k === 'falta' ? 'Estado del AT ' + fe.at_ultimo + ' en el SII: ' : 'Estado en el SII: '}${fe.texto}</span>` : ''}
+    ${f22obs.map((x) => html`<span class="sm bloque">${x.texto || 'Observación del SII'}${x.codigo ? html` <span class="xs">(${x.codigo})</span>` : ''}</span>`)}
+    ${k === 'falta' || k === 'alerta' || fe.alerta_anterior ? html`<span class="chip c-rev">Tu analista ya lo está revisando</span>` : ''}</div></div>`;
+}
+
 function observaciones(n) {
   const it = n.obs.items;
   const f29 = it.filter((x) => x.tipo.startsWith('f29_'));
@@ -92,9 +107,13 @@ function observaciones(n) {
   if (ob.length) filas.push(html`<div class="li"><span class="ic i-n" aria-hidden="true">!</span><div class="t"><b>F29 con observación del SII</b>
     <span class="sm">Tu declaración de ${mesesTxt(ob)} tiene una marca del SII para revisar.</span><span class="chip c-rev">Tu analista ya lo está revisando</span></div></div>`);
   if (!f29.length) filas.push(html`<div class="li"><span class="ic i-v" aria-hidden="true">✓</span><div class="t"><b>Tus declaraciones de IVA (F29)</b><span class="sm"><span class="ok-txt">Sin observaciones ✓</span> en los últimos meses.</span></div></div>`);
+  const fe = n.obs.f22;
+  if (fe) filas.push(filaF22(fe, f22));
+  else {
   if (f22.length) filas.push(html`<div class="li"><span class="ic i-n" aria-hidden="true">!</span><div class="t"><b>Tu declaración de renta${f22[0].anio ? ' (AT ' + f22[0].anio + ')' : ''} tiene observaciones</b>
     ${f22.map((x) => html`<span class="sm bloque">${x.texto || 'Observación del SII'}${x.codigo ? html` <span class="xs">(${x.codigo})</span>` : ''}</span>`)}<span class="chip c-rev">Tu analista ya lo está revisando</span></div></div>`);
   else filas.push(html`<div class="li"><span class="ic i-v" aria-hidden="true">✓</span><div class="t"><b>Tu declaración de renta (F22)</b><span class="sm"><span class="ok-txt">Sin observaciones ✓</span></span></div></div>`);
+  }
   // SII-OBS-2: cartas y notificaciones del SII (últimos 12 meses) y situación ante el SII.
   const ca = n.obs.cartas || { disponible: false, items: [] };
   const nuevas = ca.disponible ? ca.items.filter((x) => x.nueva) : [];
@@ -111,7 +130,8 @@ function observaciones(n) {
     <span class="sm">${cu.cumple ? html`<span class="ok-txt">Al día ✓</span>` : 'Hay condiciones por regularizar'}${cu.estado ? ' · ' + cu.estado : ''}</span>
     ${!cu.cumple ? cu.condiciones.filter((x) => x.cumple === false).map((x) => html`<span class="sm bloque">${x.titulo}</span>`) : ''}
     ${!cu.cumple ? html`<span class="chip c-rev">Tu analista ya lo está revisando</span>` : ''}</div></div>`);
-  const atencion = nd.length || ob.length || f22.length || nuevas.length || (cu.disponible && !cu.cumple);
+  const fe2 = n.obs.f22; const f22mal = fe2 ? (fe2.nivel === 'falta' || fe2.nivel === 'alerta' || fe2.alerta_anterior || f22.length > 0) : f22.length > 0;
+  const atencion = nd.length || ob.length || f22mal || nuevas.length || (cu.disponible && !cu.cumple);
   return html`<div class="card obs"><div class="hd"><h3 class="t15">Observaciones del SII</h3><span class="chip ${atencion ? 'c-pend' : 'c-ok'}">${atencion ? 'Requiere atención' : 'Sin observaciones ✓'}</span></div>
     ${filas}<div class="xs mt8">No necesitas hacer nada: si hace falta algún documento, tu analista te escribe.</div></div>`;
 }
@@ -160,15 +180,22 @@ export function tarjetaSituacion(n) {
   const cu = n.obs.cumplimiento || { disponible: false }; const ca = n.obs.cartas || { disponible: false, items: [] };
   const it = n.obs.items || [];
   const f29 = it.filter((x) => String(x.tipo || '').startsWith('f29_')).length; const f22 = it.filter((x) => x.tipo === 'f22_observacion').length;
+  const fe = n.obs.f22; const f22mal = fe ? (fe.nivel === 'falta' || fe.nivel === 'alerta' || fe.alerta_anterior || f22 > 0) : f22 > 0;
   if (!cu.disponible && !ca.disponible && !it.length) return '';
   const fila = (ok, t, xs) => html`<div class="li"><span class="ic ${ok === null ? 'i-m' : ok ? 'i-v' : 'i-n'}" aria-hidden="true">${ok === null ? '·' : ok ? '✓' : '!'}</span><div class="t"><b>${t}</b><span class="sm">${xs}</span></div></div>`;
   const filas = [
     cu.disponible ? fila(cu.cumple, 'Cumplimiento tributario (SII)', cu.cumple ? 'Cumple sus obligaciones tributarias' : 'Hay condiciones por regularizar') : fila(null, 'Cumplimiento tributario (SII)', 'Aún sin consulta al SII'),
     fila(!f29, 'Declaraciones de IVA (F29)', f29 ? (f29 === 1 ? '1 mes requiere revisión' : f29 + ' meses requieren revisión') : 'Sin observaciones'),
-    fila(!f22, 'Declaración de renta (F22)', f22 ? 'Tiene observaciones del SII' : 'Sin observaciones'),
+    (() => { const fe = n.obs.f22;
+      if (!fe) return fila(!f22, 'Declaración de renta (F22)', f22 ? 'Tiene observaciones del SII' : 'Sin observaciones');
+      if (fe.nivel === 'falta') return fila(false, 'Declaración de renta (F22)', 'No figura la del AT ' + fe.at_esperado + (fe.at_ultimo ? ' (última: AT ' + fe.at_ultimo + ')' : ''));
+      if (fe.nivel === 'sin') return fila(null, 'Declaración de renta (F22)', 'Sin declaraciones registradas en el SII');
+      if (fe.nivel === 'alerta' || f22) return fila(false, 'Declaración de renta (F22)', 'AT ' + (fe.at_ultimo || fe.at_esperado) + ' con observaciones del SII');
+      if (fe.nivel === 'neutro') return fila(null, 'Declaración de renta (F22)', 'AT ' + (fe.at_ultimo || fe.at_esperado) + ' declarada · ver estado');
+      return fila(true, 'Declaración de renta (F22)', 'AT ' + (fe.at_ultimo || fe.at_esperado) + ' declarada · sin observaciones'); })(),
     ca.disponible ? fila(!ca.total, 'Cartas y notificaciones', ca.total ? (ca.total === 1 ? '1 en los últimos 12 meses' : ca.total + ' en los últimos 12 meses') : 'Ninguna en los últimos 12 meses') : fila(null, 'Cartas y notificaciones', 'Aún sin leer del SII'),
   ];
-  const alerta = (cu.disponible && !cu.cumple) || f29 > 0 || f22 > 0 || (ca.disponible && ca.items.some((x) => x.nueva));
+  const alerta = (cu.disponible && !cu.cumple) || f29 > 0 || f22mal || (ca.disponible && ca.items.some((x) => x.nueva));
   return html`<div class="card situ"><div class="hd"><h3>Tu situación tributaria</h3><span class="chip ${alerta ? 'c-pend' : 'c-ok'}">${alerta ? 'Requiere atención' : 'Al día ✓'}</span></div>
     ${filas}
     <div class="xs mt8">${cu.actualizado ? 'Consultado en el SII el ' + fecha(cu.actualizado, { anio: true }) + '. ' : ''}${alerta ? 'Tu analista ya lo está revisando.' : 'No necesitas hacer nada.'}</div>
