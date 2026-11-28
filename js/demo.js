@@ -366,7 +366,7 @@ export const demo = {
     for (let k = 3; out.length < 12 && k < 30; k++) {
       const d = new Date(base.getTime() + k * 864e5); const dow = d.getUTCDay();
       if (dow === 0 || dow === 6 || (tema !== 'estrategico' && ![2, 3, 4].includes(dow))) continue;
-      for (const [h, m] of incl ? [[13, 30], [14, 30], [19, 30], [20, 30]] : [[13, 30], [19, 30]]) {
+      for (const [h, m] of incl ? [[13, 30], [14, 25], [19, 30], [20, 25]] : [[13, 30], [19, 30]]) {
         const i = new Date(d); i.setUTCHours(h, m, 0, 0); const f = new Date(i.getTime() + (incl ? 40 : 60) * 6e4);
         out.push({ inicio: i.toISOString(), fin: f.toISOString(), incluida: incl });
       }
