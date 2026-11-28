@@ -91,7 +91,7 @@ export function vReunionNueva(ctx, rn, nv = {}) {
     else if (!hs.length) paso2 = html`<div class="card"><h3 class="t15">2. Elige el día y la hora</h3><p class="sm">No hay horarios libres en las próximas 3 semanas para este tema. Escríbenos y te buscamos un espacio.</p></div>`;
     else {
       const dias = []; for (const h of hs) { const k = diaClave(h.inicio); let d = dias.find((x) => x.k === k); if (!d) { d = { k, ini: h.inicio, hs: [] }; dias.push(d); } d.hs.push(h); }
-      paso2 = html`<div class="card"><h3 class="t15 con-ic"><span class="ic i-a">${I.calendario}</span>2. Elige el día y la hora</h3><p class="xs m0 con-ic-xs"><span class="btn-ic">${I.reunion}</span>Hora de Chile · ${hs[0].incluida ? '30 minutos' : '1 hora'} por Google Meet</p>
+      paso2 = html`<div class="card"><h3 class="t15 con-ic"><span class="ic i-a">${I.calendario}</span>2. Elige el día y la hora</h3><p class="xs m0 con-ic-xs"><span class="btn-ic">${I.reunion}</span>Hora de Chile · ${hs[0].incluida ? '40 minutos' : '1 hora'} por Google Meet</p>
         ${dias.map((d) => html`<div class="reu-dia"><b class="sm">${diaLargo(d.ini)}</b><div class="reu-horas">${d.hs.map((h) => html`<button type="button" class="chip-h ${nv.sel === h.inicio ? 'on' : ''} ${h.incluida ? '' : 'pago'}" data-accion="ase-hora" data-inicio="${h.inicio}" aria-pressed="${nv.sel === h.inicio}">${hora(h.inicio)}${h.incluida ? '' : ' · ' + clp(rn.cupo.precio_pagada)}</button>`)}</div></div>`)}</div>`;
     }
   }
