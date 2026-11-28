@@ -390,3 +390,16 @@ details.an-mes[open] .an-cab::after{transform:rotate(-135deg);margin-top:4px}
 .leyenda{display:flex;gap:14px;font-size:12px;color:var(--t2);margin-top:2px}
 .leyenda .pt{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 b.rojo{color:#E07A6E}
+
+/* Asesorías Al Día (28-11) */
+.reu-dia{margin-top:12px}
+.reu-horas{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip-h{border:1.5px solid var(--borde);background:transparent;color:inherit;border-radius:999px;padding:8px 14px;font:600 14px Inter,sans-serif;min-height:40px;cursor:pointer}
+.chip-h.on{background:#924893;border-color:#924893;color:#fff}
+.chip-h.pago{border-style:dashed}
+.li.sel{outline:2px solid #924893;border-radius:12px}
+.minuta{border-top:1px solid var(--borde);padding-top:10px}
+.ic-mini{display:inline-block;width:16px;text-align:center;font-weight:800}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin-top:10px}
+.check input{margin-top:3px}
+.campos label.check{flex-direction:row;font-weight:500;color:inherit}

@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarImpuestosAnio, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, normalizarConvenios, validarSoporte, normalizarAvisos } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarImpuestosAnio, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, normalizarConvenios, normalizarReuniones, normalizarHorarios, validarSoporte, normalizarAvisos } from './datos.js';
 import { html, urlSegura, CORREO, sha256Hex, UUID } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
@@ -11,6 +11,7 @@ import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpre
 import { vImpuestos } from './vistas-impuestos.js';
 import { vAnio } from './vistas-anio.js';
 import { vConvenios } from './vistas-convenios.js';
+import { vReuniones, vReunionNueva } from './vistas-reuniones.js';
 import { vTerminosServidor, vAyuda, vIncorporacion, hojaTerminos } from './vistas-apertura.js';
 import { registrarServiceWorker, estadoActual, activarAvisos, desactivarAvisos } from './push.js';
 import { vNovedades } from './vistas-avisos.js';
@@ -76,13 +77,19 @@ function cargarAnual(anio) {
     });
 }
 
+async function cargarReuniones() {
+  if (!st.api.capacidades.reuniones || !st.api.reuniones) return null;
+  try { const j = await st.api.reuniones(st.empresa.ref); return j ? normalizarReuniones(j) : null; }
+  catch (e) { if (ERR_CORTE.includes(e?.codigo)) throw e; return e?.codigo === 'MC_NO_PUBLICADO' ? null : { estado: 'error' }; }
+}
+
 function ctx() {
   return {
     cfg: CONFIG, api: st.api, sesion: st.sesion, empresa: st.empresa, resumen: st.resumen, perm: st.perm, impuestos: st.impuestos, tema, version: VERSION,
     abiertos: st.abiertos, solicitudes: st.solicitudes, waMejora: WA_MEJORA, waEquipo: WA_EQUIPO, waAyuda: WA_AYUDA,
     incorporacion: st.incorporacion, misTerminos: st.cache.misTerminos,
     enlaceDoc: (u) => urlSegura(u, CONFIG.HOSTS_DOCUMENTOS),
-    avisos: st.avisos, pushEstado: st.pushEstado, convenios: st.convenios,
+    avisos: st.avisos, pushEstado: st.pushEstado, convenios: st.convenios, reuniones: st.reuniones, aseCancelar: st.aseCancelar,
     anualOk: anualDisponible(), anioPedido: st.anual?.anio ?? null,
   };
 }
@@ -104,6 +111,8 @@ function vista(r, a) {
     case 'prerenta': return vPreRenta(c);
     case 'trabajos': return vTrabajos(c);
     case 'convenios': return vConvenios(c, st.convenios);
+    case 'reuniones': return vReuniones(c, st.reuniones);
+    case 'reunion-nueva': return vReunionNueva(c, st.reuniones, st.aseNueva);
     case 'mas': return vMas(c);
     case 'acceso': return vAcceso(c);
     case 'ayuda': return vAyuda(c, { ...st.ayuda, soporte: !!st.api.capacidades.soporte, solicitudes: st.cache.solicitudes });
@@ -271,6 +280,9 @@ async function cargarResumen() {
     catch (e) { if (ERR_CORTE.includes(e?.codigo)) throw e; conv = { estado: 'error' }; }
   }
   st.convenios = conv;
+  // ASESORÍAS AL DÍA: fuera del piloto el servidor responde MC_NO_PUBLICADO → la sección no aparece (null).
+  st.reuniones = await cargarReuniones();
+  st.aseNueva = {}; st.aseCancelar = null;
   delete st.cache.solicitudes; st.ayuda = {};
   st.resumen = r;
   st.perm = permisos(st.resumen);
@@ -313,6 +325,22 @@ document.addEventListener('click', async (ev) => {
   if (acc === 'anio') { const y = Number(a.dataset.anio); if (Number.isInteger(y) && anualDisponible()) { cargarAnual(y); pintar(); } return; }
   if (acc === 'cerrar-guia-ios') { cerrarGuia(); if (esDemo) q.delete('ios'); pintar(); return; }
   if (acc === 'cerrar-hoja') { if (ev.target === a || a.tagName === 'BUTTON') { st.hoja = null; pintar(); } return; }
+  if (acc === 'ase-tema') {
+    const tema = a.dataset.tema; if (!['estrategico', 'contable', 'rrhh'].includes(tema)) return;
+    const marca = {}; st.aseNueva = { tema, horarios: 'cargando', marca }; pintar();
+    try { const j = await st.api.reunionHorarios(st.empresa.ref, tema); if (st.aseNueva.marca === marca) { st.aseNueva.horarios = normalizarHorarios(j); pintar(); } }
+    catch (e) { if (ERR_CORTE.includes(e?.codigo)) { await manejarError(e); return; } if (st.aseNueva.marca === marca) { st.aseNueva.horarios = 'error'; pintar(); } }
+    return;
+  }
+  if (acc === 'ase-hora') { st.aseNueva = { ...st.aseNueva, sel: a.dataset.inicio, mensaje: null }; pintar(); return; }
+  if (acc === 'ase-cancelar') { st.aseCancelar = Number(a.dataset.id); pintar(); return; }
+  if (acc === 'ase-cancelar-no') { st.aseCancelar = null; pintar(); return; }
+  if (acc === 'ase-cancelar-si') {
+    const id = Number(a.dataset.id); a.disabled = true;
+    try { await st.api.reunionCancelar(st.empresa.ref, id); st.flash = 'Cancelamos tu reunión. Se te devolvió el cupo.'; }
+    catch (e) { if (ERR_CORTE.includes(e?.codigo)) { await manejarError(e); return; } st.flash = mensajeError(e?.codigo); }
+    st.aseCancelar = null; st.reuniones = await cargarReuniones(); pintar(); return;
+  }
   if (acc === 'empresas') { st.hoja = () => hojaEmpresas(ctx()); pintar(); return; }
   if (acc === 'elegir') {
     const e = st.sesion.empresas.find((x) => x.ref === a.dataset.ref);
@@ -438,6 +466,20 @@ document.addEventListener('submit', async (ev) => {
           st.ayuda = { tipo, texto, mensaje: mensajeError(e?.codigo) }; pintar(); return;
         }
         delete st.cache.solicitudes; pintar(); return;
+      }
+      case 'reunion': {
+        const nv = st.aseNueva || {}; const motivo = String(d.get('motivo') || ''); const pago = !!d.get('pago');
+        if (motivo.trim().length < 5) { st.aseNueva = { ...nv, motivo, aceptoPago: pago, mensaje: mensajeError('ASE_MOTIVO') }; pintar(); return; }
+        const sel = Array.isArray(nv.horarios) ? nv.horarios.find((h) => h.inicio === nv.sel) : null;
+        if (!sel) { st.aseNueva = { ...nv, mensaje: 'Elige una hora.' }; pintar(); return; }
+        if (!sel.incluida && !pago) { st.aseNueva = { ...nv, motivo, mensaje: 'Para pedir esta asesoría adicional, marca que aceptas el valor.' }; pintar(); return; }
+        try { await st.api.reunionSolicitar(st.empresa.ref, nv.tema, sel.inicio, motivo, !sel.incluida); }
+        catch (e) {
+          if (ERR_CORTE.includes(e?.codigo)) throw e;
+          st.aseNueva = { ...nv, motivo, aceptoPago: pago, mensaje: mensajeError(e?.codigo), ...(e?.codigo === 'ASE_HORA_NO_DISPONIBLE' ? { sel: null } : {}) }; pintar(); return;
+        }
+        st.aseNueva = {}; st.reuniones = await cargarReuniones();
+        st.flash = '¡Listo! Pedimos tu reunión. Tu asesor la confirmará y te llegará la invitación.'; ir('reuniones'); return;
       }
       case 'solicitud': {
         const err = validarSolicitud(f.dataset.tipo, String(d.get('fecha') || ''), d.get('archivo'));

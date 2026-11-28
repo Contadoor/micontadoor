@@ -33,6 +33,7 @@ export function capacidadesDe(cfg) {
     soporte: !!(r.SOPORTE_CREAR && r.MIS_SOLICITUDES),
     incorporacion: !!r.INCORPORACION,
     convenios: !!r.MIS_CONVENIOS,
+    reuniones: !!(r.MIS_REUNIONES && r.REUNION_HORARIOS && r.REUNION_SOLICITAR && r.REUNION_CANCELAR),
     historialImpuestos: !!r.HISTORIAL_IMPUESTOS,
   };
 }
@@ -135,6 +136,13 @@ export function crearApiReal(cfg) {
       if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
       return rpc(cfg.RPC.MIS_SOLICITUDES, { p_ref: ref });
     },
+    async reuniones(ref) { if (!cfg.RPC.MIS_REUNIONES) return null; if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO'); return rpc(cfg.RPC.MIS_REUNIONES, { p_ref: ref }); },
+    async reunionHorarios(ref, tema) { if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO'); return rpc(cfg.RPC.REUNION_HORARIOS, { p_ref: ref, p_tema: tema }); },
+    async reunionSolicitar(ref, tema, inicio, motivo, pagada) {
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.REUNION_SOLICITAR, { p_ref: ref, p_tema: tema, p_inicio: inicio, p_motivo: String(motivo).trim(), p_pagada: pagada === true });
+    },
+    async reunionCancelar(ref, id) { if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO'); return rpc(cfg.RPC.REUNION_CANCELAR, { p_ref: ref, p_id: id }); },
     async convenios(ref) {
       if (!cfg.RPC.MIS_CONVENIOS) return null;
       if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
@@ -221,7 +229,7 @@ export function crearApiDemo(demo, opciones = {}) {
   const soporte = demo.soporteNuevo();
   return {
     modo: 'demo',
-    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: true, convenios: true,
+    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: true, convenios: true, reuniones: true,
       // MC-6: en la demo hay Novedades siempre; el push se SIMULA (opciones.avisos = inactivo | activo | bloqueado | ios | no_soportado).
       novedades: true, push: true, pushDemo: opciones.avisos || 'inactivo' },
     tieneSesion: () => dentro,
@@ -248,6 +256,10 @@ export function crearApiDemo(demo, opciones = {}) {
     async terminosTexto(v) { const r = await demo.terminosTexto(v); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
     async soporteCrear(ref, tipo, mensaje) { const r = soporte.crear(ref, tipo, mensaje); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
     async misSolicitudes(ref) { return espera(soporte.listar(ref)); },
+    async reuniones(ref) { const r = demo.reuniones(ref); if (!r) throw new ErrorApi('MC_SIN_ACCESO'); return espera(r); },
+    async reunionHorarios(ref, tema) { return espera(demo.reunionHorarios(ref, tema)); },
+    async reunionSolicitar(ref, tema, inicio, motivo, pagada) { const r = demo.reunionSolicitar(ref, tema, inicio, motivo, pagada); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
+    async reunionCancelar(ref, id) { const r = demo.reunionCancelar(ref, id); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
     async convenios(ref) { const r = demo.convenios(ref); if (!r) throw new ErrorApi('MC_SIN_ACCESO'); return espera(r); },
     async incorporacion(ref) {
       const r = demo.incorporacion(ref, opciones);

@@ -145,6 +145,12 @@ export function mensajeError(codigo) {
     case 'MC_TERMINOS_VERSION': return 'Los términos se actualizaron mientras los leías. Revisa la versión nueva y vuelve a aceptar.';
     case 'MC_LIMITE': return 'Ya nos enviaste varias solicitudes hoy. Si es urgente, escríbenos por WhatsApp.';
     case 'MC_DATOS': return 'Revisa los datos e inténtalo de nuevo.';
+    case 'ASE_HORA_NO_DISPONIBLE': return 'Esa hora se acaba de ocupar. Elige otra, por favor.';
+    case 'ASE_SIN_CUPO': return 'Ya usaste tu reunión incluida de este período. Marca que aceptas la asesoría adicional para pedirla.';
+    case 'ASE_MOTIVO': return 'Cuéntanos en pocas palabras qué quieres revisar (al menos 5 letras).';
+    case 'ASE_SIN_CLAVES': return 'Por seguridad, no escribas contraseñas ni claves en el motivo.';
+    case 'ASE_SIN_ANFITRION': return 'Aún no tienes un asesor asignado para este tema. Escríbenos y lo resolvemos.';
+    case 'ASE_NO_CANCELABLE': return 'Esta reunión ya no se puede cancelar desde aquí. Escríbenos.';
     case 'TERMINOS_HUELLA': return 'No pudimos comprobar el texto de los términos. Por seguridad no se pueden aceptar ahora; inténtalo de nuevo en unos minutos.';
     default: return 'Algo no salió bien. Inténtalo de nuevo en unos minutos.';
   }
@@ -631,4 +637,35 @@ export function normalizarConvenios(j) {
       vencidas: cuotas.filter((q) => q.estado === 'vencida').length, prox, cuotas };
   });
   return { estado: 'ok', lista, activos: lista.filter((c) => c.activo) };
+}
+
+// ASESORÍAS AL DÍA · contrato mc.mis_reuniones(p_ref) → { ok, cupo:{plan,n,cada_meses,desde,hasta,usadas,disponibles,precio_pagada,...},
+//   temas:[{tema, disponible, con:{nombre,iniciales}}], proximas:[r], historial:[r], acuerdos_abiertos:[{id,descripcion,responsable,quien,vence,vencido}] }
+const TEMAS_REU = new Set(['estrategico', 'contable', 'rrhh']);
+const EST_REU = new Set(['solicitada', 'confirmada', 'cancelada', 'realizada', 'no_asistio', 'cerrada']);
+const fechaHora = (v) => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null);
+const URL_MEET = /^https:\/\/meet\.google\.com\/[a-z0-9-]{3,40}$/i;
+function reu(r) {
+  if (!r || !Number.isInteger(r.id) || !TEMAS_REU.has(r.tema) || !EST_REU.has(r.estado) || !fechaHora(r.inicio) || !fechaHora(r.fin)) return null;
+  const m = r.minuta && typeof r.minuta === 'object' ? { resumen: texto(r.minuta.resumen, 3000), seguimiento: texto(r.minuta.seguimiento, 2000), proxima: texto(r.minuta.proxima, 500),
+    acuerdos: (Array.isArray(r.minuta.acuerdos) ? r.minuta.acuerdos : []).filter((g) => g && texto(g.descripcion, 300)).slice(0, 30)
+      .map((g) => ({ descripcion: texto(g.descripcion, 300), quien: texto(g.quien, 80) || 'Contadoor', vence: fechaOk(g.vence), estado: g.estado === 'cumplido' ? 'cumplido' : 'pendiente' })) } : null;
+  return { id: r.id, tema: r.tema, estado: r.estado, inicio: r.inicio, fin: r.fin, motivo: texto(r.motivo, 1000) || '', pagada: r.pagada === true, precio: pesos(r.precio),
+    con: r.con && texto(r.con.nombre, 80) ? { nombre: texto(r.con.nombre, 80) } : null, meet_url: URL_MEET.test(String(r.meet_url || '')) ? r.meet_url : null,
+    puede_cancelar: r.puede_cancelar === true, minuta: m && m.resumen ? m : null };
+}
+export function normalizarReuniones(j) {
+  if (!j || j.ok !== true || !j.cupo || typeof j.cupo !== 'object') return { estado: 'error' };
+  const c = j.cupo;
+  const cupo = { plan: texto(c.plan, 40), n: Number.isInteger(c.n) ? c.n : 0, cada_meses: Number.isInteger(c.cada_meses) ? c.cada_meses : 1, desde: fechaOk(c.desde), hasta: fechaOk(c.hasta),
+    usadas: Number.isInteger(c.usadas) ? c.usadas : 0, disponibles: Number.isInteger(c.disponibles) ? c.disponibles : 0, precio_pagada: pesos(c.precio_pagada) ?? 35000 };
+  const temas = (Array.isArray(j.temas) ? j.temas : []).filter((t) => t && TEMAS_REU.has(t.tema)).map((t) => ({ tema: t.tema, disponible: t.disponible === true, con: t.con && texto(t.con.nombre, 80) ? { nombre: texto(t.con.nombre, 80) } : null }));
+  const lista = (x) => (Array.isArray(x) ? x : []).map(reu).filter(Boolean).slice(0, 30);
+  const acuerdos = (Array.isArray(j.acuerdos_abiertos) ? j.acuerdos_abiertos : []).filter((g) => g && texto(g.descripcion, 300)).slice(0, 30)
+    .map((g) => ({ descripcion: texto(g.descripcion, 300), quien: texto(g.quien, 80) || 'Contadoor', vence: fechaOk(g.vence), vencido: g.vencido === true }));
+  return { estado: 'ok', cupo, temas, proximas: lista(j.proximas), historial: lista(j.historial), acuerdos };
+}
+export function normalizarHorarios(j) {
+  if (!j || j.ok !== true || !Array.isArray(j.horarios)) return 'error';
+  return j.horarios.filter((h) => h && fechaHora(h.inicio) && fechaHora(h.fin)).slice(0, 120).map((h) => ({ inicio: h.inicio, fin: h.fin, incluida: h.incluida === true }));
 }
