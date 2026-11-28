@@ -99,13 +99,13 @@ test('api real: MC_LIMITE del servidor llega como código; con RPC en null no se
   try {
     const api = crearApiReal(CONFIG); await api.ingresar('a@b.cl', 'x');
     await assert.rejects(api.soporteCrear(REF, 'consulta', 'hola hola hola'), (e) => e.codigo === 'MC_LIMITE');
-    const nulo = { ...CONFIG, RPC: { ...CONFIG.RPC, TERMINOS_VIGENTES: null, INCORPORACION: null, MIS_SOLICITUDES: null, MIS_TERMINOS: null, HISTORIAL_IMPUESTOS: null } };
+    const nulo = { ...CONFIG, RPC: { ...CONFIG.RPC, TERMINOS_VIGENTES: null, INCORPORACION: null, MIS_SOLICITUDES: null, MIS_TERMINOS: null, HISTORIAL_IMPUESTOS: null, MIS_CONVENIOS: null } };
     const api2 = crearApiReal(nulo); await api2.ingresar('a@b.cl', 'x');
     const antes = f.llamadas.length;
     assert.equal(await api2.terminosVigentes(), null); assert.equal(await api2.incorporacion(REF), null);
     assert.equal(await api2.misSolicitudes(REF), null); assert.equal(await api2.misTerminos(), null); assert.equal(await api2.diagnostico(REF), null);
     assert.equal(f.llamadas.length, antes);
-    assert.deepEqual(capacidadesDe(nulo), { solicitudPago: false, terminosServidor: false, misTerminos: false, soporte: false, incorporacion: false, historialImpuestos: false });
+    assert.deepEqual(capacidadesDe(nulo), { solicitudPago: false, terminosServidor: false, misTerminos: false, soporte: false, incorporacion: false, convenios: false, historialImpuestos: false });
   } finally { f.restaurar(); }
 });
 

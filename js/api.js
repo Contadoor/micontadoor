@@ -32,6 +32,7 @@ export function capacidadesDe(cfg) {
     misTerminos: !!(r.MIS_TERMINOS && r.TERMINOS_TEXTO),
     soporte: !!(r.SOPORTE_CREAR && r.MIS_SOLICITUDES),
     incorporacion: !!r.INCORPORACION,
+    convenios: !!r.MIS_CONVENIOS,
     historialImpuestos: !!r.HISTORIAL_IMPUESTOS,
   };
 }
@@ -134,6 +135,11 @@ export function crearApiReal(cfg) {
       if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
       return rpc(cfg.RPC.MIS_SOLICITUDES, { p_ref: ref });
     },
+    async convenios(ref) {
+      if (!cfg.RPC.MIS_CONVENIOS) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      return rpc(cfg.RPC.MIS_CONVENIOS, { p_ref: ref });
+    },
     async incorporacion(ref) {
       if (!cfg.RPC.INCORPORACION) return null;
       if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
@@ -215,7 +221,7 @@ export function crearApiDemo(demo, opciones = {}) {
   const soporte = demo.soporteNuevo();
   return {
     modo: 'demo',
-    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: true,
+    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: true, convenios: true,
       // MC-6: en la demo hay Novedades siempre; el push se SIMULA (opciones.avisos = inactivo | activo | bloqueado | ios | no_soportado).
       novedades: true, push: true, pushDemo: opciones.avisos || 'inactivo' },
     tieneSesion: () => dentro,
@@ -242,6 +248,7 @@ export function crearApiDemo(demo, opciones = {}) {
     async terminosTexto(v) { const r = await demo.terminosTexto(v); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
     async soporteCrear(ref, tipo, mensaje) { const r = soporte.crear(ref, tipo, mensaje); if (!r.ok) throw new ErrorApi(r.codigo); return espera(r); },
     async misSolicitudes(ref) { return espera(soporte.listar(ref)); },
+    async convenios(ref) { const r = demo.convenios(ref); if (!r) throw new ErrorApi('MC_SIN_ACCESO'); return espera(r); },
     async incorporacion(ref) {
       const r = demo.incorporacion(ref, opciones);
       if (!r) throw new ErrorApi('MC_SIN_ACCESO');

@@ -6,6 +6,7 @@ import { cabecera, sub, teaser, vacio, paso, waCard, chipEstadoProy } from './vi
 import { tarjetaIncorporacion } from './vistas-apertura.js';
 import { kpiImpuestos, tarjetaSituacion } from './vistas-impuestos.js';
 import { bloqueNovedades } from './vistas-avisos.js';
+import { tarjetaConvenios } from './vistas-convenios.js';
 
 const ICO_NOV = { reporte: ['i-a', I.grafico], pago: ['i-v', I.check], proy: ['i-i', I.calendario], te: ['i-m', I.llave] };
 
@@ -62,7 +63,7 @@ export function vInicio(ctx) {
   return html`${cabecera(ctx, extra)}<div class="sec">
     ${ctx.avisos ? bloqueNovedades(ctx) : nov.length ? html`<h2>Novedades</h2><div class="card">${nov.map((n) => { const [c, ic] = ICO_NOV[n.tipo] || ICO_NOV.reporte;
       return html`<button type="button" class="li kpi-btn" data-ir="${n.ir}"><span class="ic ${c}">${ic}</span><div class="t"><b>${n.t}</b><span class="sm">${n.xs}</span></div><span class="punto" aria-hidden="true"></span></button>`; })}</div>` : ''}
-    ${tarjetaIncorporacion(ctx.incorporacion)}${proy}${tarjetaSituacion(ctx.impuestos)}${cuenta}${waCard(ctx.waEquipo)}</div>`;
+    ${tarjetaIncorporacion(ctx.incorporacion)}${proy}${tarjetaSituacion(ctx.impuestos)}${tarjetaConvenios(ctx.convenios)}${cuenta}${waCard(ctx.waEquipo)}</div>`;
 }
 
 function filaPendiente(o) {

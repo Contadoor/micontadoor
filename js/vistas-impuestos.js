@@ -158,7 +158,7 @@ export function vImpuestos(ctx, n) {
     const e = n.est; const total = totalMostrado(n); const v = validado(n);
     const detalle = v ? (n.oficial.confirmado_en ? `Reporte mensual publicado el ${fecha(n.oficial.confirmado_en, { anio: true })}` : 'Según tu reporte del mes')
       : n.preiva ? `Revisado por tu analista${n.preiva.enviado_en ? ' el ' + fecha(n.preiva.enviado_en, { anio: true }) : ''}; puede cambiar hasta que se publique el reporte`
-        : (e.iva_pagar !== null && e.ppm !== null ? `IVA ${clp(e.iva_pagar)} + PPM ${clp(e.ppm)}` : 'Falta un dato para el total: lo confirma tu analista');
+        : (e.iva_pagar !== null && e.ppm !== null ? (soloPpm(n) ? `Tus ventas son exentas de IVA: este mes pagas solo el PPM (${clp(e.ppm)})` : `IVA ${clp(e.iva_pagar)} + PPM ${clp(e.ppm)}`) : 'Falta un dato para el total: lo confirma tu analista');
     cuerpo = html`<div class="card osc"><div class="hd"><h2>${v ? 'IVA a pagar en ' : 'IVA estimado a pagar en '}${mesSig(n.periodo)}</h2>${chipEstado(v)}</div>
         <div class="big">${total === null ? 'Por confirmar' : clp(total)}</div>
         <div class="sm">${detalle}${n.vence ? html` · se declara y paga hasta el <b class="claro">${fecha(n.vence, { anio: true })}</b>` : ''}</div>
@@ -204,9 +204,15 @@ export function tarjetaSituacion(n) {
     <button type="button" class="btn lin" data-ir="preiva">Ver el detalle</button></div>`;
 }
 
+/** MC-PPM-1 (Luciano 28-11): ventas solo exentas (sin IVA de ventas) → lo que se paga en el F29 es el PPM. */
+export function soloPpm(n) {
+  const e = n?.est; if (!e) return false;
+  return (e.exenta || ((e.ventas_neto ?? 0) === 0 && (e.ventas_exento ?? 0) > 0)) && (e.debito ?? 0) === 0 && e.ppm !== null && e.ppm > 0;
+}
+
 export function kpiImpuestos(n) {
   if (!n || n.estado !== 'ok') return '';
   const t = totalMostrado(n); const v = validado(n);
   return html`<button type="button" class="card kpi-btn" data-ir="preiva"><div class="hd"><b>${tituloDe(n)}</b><span class="chip ${v ? 'c-ok' : 'c-proy'}">${v ? 'Validado' : 'Estimado'}</span></div>
-    <div class="mid s21">${t === null ? 'Por confirmar' : clp(t)}</div><div class="xs">${n.vence ? 'Vence el ' + fecha(n.vence) : periodoTitulo(n.periodo)}</div></button>`;
+    <div class="mid s21">${t === null ? 'Por confirmar' : clp(t)}</div><div class="xs">${soloPpm(n) && !v ? 'Ventas exentas: pagas solo PPM · ' : ''}${n.vence ? 'Vence el ' + fecha(n.vence) : periodoTitulo(n.periodo)}</div></button>`;
 }

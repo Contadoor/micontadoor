@@ -30,7 +30,7 @@ export function tabs(ctx, actual) {
     ['reporte', 'Reporte', I.grafico, ['reporte', 'historial']],
     p.verMiCuenta ? ['cuenta', 'Mi cuenta', I.tarjeta, ['cuenta', 'pago']] : null,
     (p.preIva !== 'sin_permiso' || p.preRenta !== 'sin_permiso') ? ['preiva', 'Proyecciones', I.proyecciones, ['preiva', 'impuestos-historial', 'prerenta']] : null,
-    ['mas', 'Más', I.mas, ['mas', 'trabajos', 'acceso', 'ayuda', 'incorporacion']],
+    ['mas', 'Más', I.mas, ['mas', 'trabajos', 'acceso', 'ayuda', 'incorporacion', 'convenios']],
   ].filter(Boolean);
   // Solo en computador (barra lateral): accesos directos que en el celular viven dentro de «Más».
   const inc = ctx.incorporacion?.estado === 'ok' && ctx.incorporacion.disponible;
