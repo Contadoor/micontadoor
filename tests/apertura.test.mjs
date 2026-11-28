@@ -99,7 +99,7 @@ test('api real: MC_LIMITE del servidor llega como código; con RPC en null no se
   try {
     const api = crearApiReal(CONFIG); await api.ingresar('a@b.cl', 'x');
     await assert.rejects(api.soporteCrear(REF, 'consulta', 'hola hola hola'), (e) => e.codigo === 'MC_LIMITE');
-    const nulo = { ...CONFIG, RPC: { ...CONFIG.RPC, TERMINOS_VIGENTES: null, INCORPORACION: null, MIS_SOLICITUDES: null, MIS_TERMINOS: null } };
+    const nulo = { ...CONFIG, RPC: { ...CONFIG.RPC, TERMINOS_VIGENTES: null, INCORPORACION: null, MIS_SOLICITUDES: null, MIS_TERMINOS: null, HISTORIAL_IMPUESTOS: null } };
     const api2 = crearApiReal(nulo); await api2.ingresar('a@b.cl', 'x');
     const antes = f.llamadas.length;
     assert.equal(await api2.terminosVigentes(), null); assert.equal(await api2.incorporacion(REF), null);
@@ -178,9 +178,9 @@ test('diagnóstico "Aquí partimos": en preparación vs listo con fecha de la re
   assert.ok(!/href=/.test(listo), 'sin enlace ni documento todavía');
 });
 
-test('menú: «Mis impuestos · historial» oculto mientras HISTORIAL_IMPUESTOS sea null', () => {
-  assert.equal(CONFIG.RPC.HISTORIAL_IMPUESTOS, null); assert.equal(CONFIG.RPC.DIAGNOSTICO, null);
-  const c = ctxBase();
+test('menú: «Mis impuestos · historial» solo con la capacidad (28-11: publicada con mis_impuestos_anio)', () => {
+  assert.equal(CONFIG.RPC.HISTORIAL_IMPUESTOS, 'mis_impuestos_anio'); assert.equal(CONFIG.RPC.DIAGNOSTICO, null);
+  const c = ctxBase({ api: { modo: 'demo', capacidades: { historialImpuestos: false } } });
   assert.ok(!String(tabs(c, 'inicio')).includes('impuestos-historial') && !String(vMas(c)).includes('impuestos-historial'));
   const c2 = ctxBase({ api: { modo: 'demo', capacidades: { historialImpuestos: true } } });
   assert.ok(String(tabs(c2, 'inicio')).includes('Mis impuestos · historial') && String(vMas(c2)).includes('impuestos-historial'));

@@ -266,6 +266,20 @@ function incorporacionDe(ref, opciones) {
     pasos: PASOS_INC.map((titulo, i) => ({ orden: i + 1, titulo, estado: est[i] })) };
 }
 const rolDe = (e, opciones) => (opciones.rol === 'consulta' ? 'consulta' : e.rol);
+// «Tu año con el SII» (forma de mc.mis_impuestos_anio). Cifras FICTICIAS: un mes de cada estado de pago.
+const F29_VACIO = { estado: 'sin_dato', rectificada: false, montos: false, iva_determinado: null, remanente: null, resultado: null, retenciones: null, impuesto_unico: null, ppm: null, ppm_tasa: null, recargos: null, total_a_pagar: null };
+const f29d = (iva, ppm, o = {}) => ({ ...F29_VACIO, estado: 'declarado', montos: true, iva_determinado: iva, remanente: 0, resultado: iva > 0 ? 'iva_a_pagar' : 'cero', retenciones: 15000, impuesto_unico: 42000, ppm, ppm_tasa: 1.25,
+  total_a_pagar: iva + ppm + 57000, ...o });
+const pg = (estado, fuente = 'contadoor') => ({ estado, fuente, fecha: null });
+const ANIO_2026 = {
+  1: { f: f29d(310000, 48000), p: pg('pagado') }, 2: { f: f29d(0, 49500, { remanente: 85000, resultado: 'remanente', total_a_pagar: 106500 }), p: pg('sin_informacion', null) },
+  3: { f: f29d(0, 51000, { resultado: 'cero', total_a_pagar: 108000 }), p: pg('postergado', 'sii') }, 4: { f: f29d(290000, 52500), p: pg('pagado') },
+  5: { f: { ...F29_VACIO, estado: 'no_declarado' }, p: pg('sin_informacion', null) }, 6: { f: f29d(305000, 55500, { rectificada: true }), p: pg('postergado') },
+  7: { f: f29d(298000, 57000), p: pg('girado') }, 8: { f: f29d(321000, 58500), p: pg('pendiente') },
+  9: { f: { ...f29d(0, 0), retenciones: 0, impuesto_unico: 0, total_a_pagar: 0 }, p: pg('nada_que_pagar', 'sii') }, 10: { f: f29d(334000, 61500, { recargos: 9800 }), p: pg('sin_informacion', null) },
+};
+const ANIO_2025 = (m) => ({ f: f29d(250000 + m * 4000, 40000 + m * 1000), p: pg(m <= 10 ? 'pagado' : 'sin_informacion', m <= 10 ? 'contadoor' : null) });
+
 
 // MC-6 · Novedades ficticias (forma de mc.avisos). El servidor las crea POR VÍNCULO; aquí se simula su filtro de permisos.
 const hace = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
@@ -289,6 +303,27 @@ const AVISOS = {
 const leidos = new Set();
 
 export const demo = {
+  /** Igual que mc.mis_impuestos_anio (REPORTE-HISTORIAL-SII). Río: año completo con todos los estados de pago; Alerce: aún no conectada. */
+  impuestosAnio(ref, anio) {
+    const e = EMPRESAS.find((x) => x.ref === ref);
+    if (!e) return null;
+    const a = Number.isInteger(anio) ? anio : 2026;
+    if (a !== 2026 && a !== 2025) return { ok: false, codigo: 'MC_PERIODO_INVALIDO' };
+    const meses = [];
+    for (let m = 1; m <= 12; m++) {
+      const futuro = a === 2026 && m === 12; const enCurso = a === 2026 && m === 11; const x = a === 2026 ? ANIO_2026[m] : ANIO_2025(m);
+      const conRcv = ref !== REF.alerce && !futuro;
+      meses.push({ periodo: `${a}${String(m).padStart(2, '0')}`, mes: m, futuro, en_curso: enCurso, vence: `${m === 12 ? a + 1 : a}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-20`,
+        ventas: conRcv ? { neto: 3800000 + m * 125000, exento: 0, iva: 722000 + m * 23750, documentos: 40 + m } : null,
+        compras: conRcv ? { neto: 2100000 + m * 60000, exento: 0, iva: 399000 + m * 11400, documentos: 22 + (m % 5) } : null,
+        f29: ref !== REF.alerce && x ? x.f : { ...F29_VACIO, estado: futuro || enCurso ? 'futuro' : 'sin_dato' }, pago: ref !== REF.alerce && x ? x.p : null });
+    }
+    const f = meses.filter((z) => z.f29.montos);
+    return { ok: true, ref, anio: a, conexion: { estado: ref === REF.alerce ? 'no_conectado' : 'conectado' }, datos_al: '2026-11-24T12:05:00Z',
+      totales: { ventas_neto: meses.reduce((s, z) => s + (z.ventas?.neto || 0), 0), compras_neto: meses.reduce((s, z) => s + (z.compras?.neto || 0), 0),
+        total_a_pagar: f.reduce((s, z) => s + z.f29.total_a_pagar, 0), ppm: f.reduce((s, z) => s + z.f29.ppm, 0), meses_con_f29: f.length },
+      meses };
+  },
   refs: REF,
   correo: true,                         // R2: preferencia de correo simulada (la cambia «Avisos por correo»)
   /** Igual que mc.avisos(p_ref): por vínculo; sin Mi cuenta, el servidor no entrega avisos de pagos. */

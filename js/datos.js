@@ -574,3 +574,43 @@ export function textoAvisoReporte(a) {
   if (a?.codigo === 'IU_PENDIENTE_RRHH') return 'El impuesto único de tus trabajadores se agrega cuando Remuneraciones quede lista.';
   return null;
 }
+
+// REPORTE-HISTORIAL-SII · contrato mc.mis_impuestos_anio(p_ref, p_anio) (gestoor-backend-reporte-historial, migración 202611241500):
+//   { ok, ref, anio, conexion:{estado:'conectado'|'no_conectado'}, datos_al, totales:{…}, meses:[12 × { periodo:'AAAAMM', mes, futuro, en_curso, vence,
+//     ventas:{neto,exento,iva,documentos}|null, compras:{…}|null, f29:{estado,rectificada,montos,iva_determinado,remanente,resultado,retenciones,
+//     impuesto_unico,ppm,ppm_tasa,recargos,total_a_pagar}, pago:{estado,fuente:'sii'|'contadoor',fecha}|null }] }
+// Fail-closed: si no llegan exactamente los 12 meses en orden, es un error (nunca se rellena ni se inventa un mes).
+export const ESTADOS_PAGO = Object.freeze({
+  pagado: ['c-ok', 'Pagado'], postergado: ['c-pend', 'Postergado'], pendiente: ['c-venc', 'Pendiente de pago'], girado: ['c-venc', 'Girado'],
+  nada_que_pagar: ['c-gris', 'Sin monto a pagar'], sin_informacion: ['c-gris', 'Sin información'],
+});
+const ESTADOS_F29_ANIO = new Set([...ESTADOS_F29, 'futuro']);
+const RESULTADOS = new Set(['iva_a_pagar', 'remanente', 'cero']);
+const libro = (x) => (x && typeof x === 'object' && Number.isInteger(x.documentos) ? { neto: pesos(x.neto), exento: pesos(x.exento), iva: pesos(x.iva), documentos: x.documentos } : null);
+export function normalizarImpuestosAnio(j) {
+  if (!j || j.ok !== true || !Number.isInteger(j.anio) || !Array.isArray(j.meses) || j.meses.length !== 12) return { estado: 'error' };
+  const meses = [];
+  for (let i = 0; i < 12; i++) {
+    const m = j.meses[i];
+    if (!m || m.mes !== i + 1 || String(m.periodo) !== `${j.anio}${String(i + 1).padStart(2, '0')}` || !m.f29 || typeof m.f29 !== 'object') return { estado: 'error' };
+    const f = m.f29; const montos = f.montos === true;
+    const pago = m.pago && typeof m.pago === 'object' && ESTADOS_PAGO[m.pago.estado]
+      ? { estado: m.pago.estado, fuente: m.pago.fuente === 'sii' ? 'sii' : m.pago.fuente === 'contadoor' ? 'contadoor' : null, fecha: fechaOk(m.pago.fecha) } : null;
+    meses.push({
+      periodo: periodoGuion(m.periodo), mes: i + 1, futuro: m.futuro === true, en_curso: m.en_curso === true, vence: fechaOk(m.vence),
+      ventas: libro(m.ventas), compras: libro(m.compras),
+      f29: { estado: ESTADOS_F29_ANIO.has(f.estado) ? f.estado : 'sin_dato', rectificada: f.rectificada === true, montos,
+        resultado: montos && RESULTADOS.has(f.resultado) ? f.resultado : null,
+        iva: montos ? pesos(f.iva_determinado) : null, remanente: montos ? pesos(f.remanente) : null, retenciones: montos ? pesos(f.retenciones) : null,
+        impuesto_unico: montos ? pesos(f.impuesto_unico) : null, ppm: montos ? pesos(f.ppm) : null, ppm_tasa: montos ? num(f.ppm_tasa) : null,
+        recargos: montos ? pesos(f.recargos) : null, total: montos ? pesos(f.total_a_pagar) : null },
+      pago,
+    });
+  }
+  const t = j.totales && typeof j.totales === 'object' ? j.totales : {};
+  return {
+    estado: j.conexion?.estado === 'conectado' ? 'ok' : 'no_conectado', anio: j.anio, datos_al: fechaOk(j.datos_al), meses,
+    totales: { ventas: pesos(t.ventas_neto), compras: pesos(t.compras_neto), total: pesos(t.total_a_pagar), ppm: pesos(t.ppm),
+      meses_f29: Number.isInteger(t.meses_con_f29) ? t.meses_con_f29 : meses.filter((x) => x.f29.montos).length },
+  };
+}
