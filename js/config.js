@@ -32,7 +32,7 @@ export const CONFIG = Object.freeze({
     MIS_SOLICITUDES: 'mis_solicitudes',         // «Tus solicitudes»
     INCORPORACION: 'mi_incorporacion',          // «Tu incorporación» (ONBOARDING-V2)
     DIAGNOSTICO: null,                          // «Tu diagnóstico "Aquí partimos"»: aún sin informe ni RPC (espacio listo)
-    HISTORIAL_IMPUESTOS: null,                  // historial anual (otro paquete, feat/reporte-historial-sii): menú oculto mientras sea null
+    HISTORIAL_IMPUESTOS: 'mis_impuestos_anio',  // «Tu año con el SII» (mc.mis_impuestos_anio, instalada 24-11): año actual y anterior, con gráficos
 
     // MC-6 (avisos) · backend MC6A instalado en producción (migración 202611121400_mc6a_avisos). null = sin Novedades ni «Activar avisos».
     AVISOS: 'avisos',                   // mc.avisos(p_ref, p_limite)

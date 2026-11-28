@@ -22,8 +22,10 @@ const mesSig = (p) => { const x = parsePeriodo(p); return x ? MESES[x.mes % 12] 
 const pct = (t) => (t === null || t === undefined ? '' : String(t).replace('.', ','));
 const hoyChile = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
 
-function seg(actual) {
-  return html`<div class="seg" role="group" aria-label="Proyecciones"><button type="button" data-ir="preiva" class="${actual === 'preiva' ? 'on' : ''}" aria-pressed="${actual === 'preiva'}">Pre-IVA</button><button type="button" data-ir="prerenta" class="${actual === 'prerenta' ? 'on' : ''}" aria-pressed="${actual === 'prerenta'}">Pre-Renta</button></div>`;
+// «Tu año» (mc.mis_impuestos_anio) aparece entre «Pre-IVA» y «Pre-Renta» cuando la RPC está disponible.
+export function seg(actual, conAnio = false) {
+  const b = (r, t) => html`<button type="button" data-ir="${r}" class="${actual === r ? 'on' : ''}" aria-pressed="${actual === r}">${t}</button>`;
+  return html`<div class="seg" role="group" aria-label="Proyecciones">${b('preiva', 'Pre-IVA')}${conAnio ? b('impuestos-historial', 'Tu año') : ''}${b('prerenta', 'Pre-Renta')}</div>`;
 }
 
 function linea(t, xs, v, clase = '') {
@@ -169,7 +171,7 @@ export function vImpuestos(ctx, n) {
       ${calculo(n)}${estadoF29(n)}${recomendaciones(n)}${observaciones(n)}
       <p class="xs c">${v ? 'Este es el monto de tu reporte del mes, validado por Contadoor.' : 'Es una estimación con tus datos del SII: el monto final es el del reporte que cierra tu analista.'}</p>`;
   }
-  return html`${sub(titulo, { chip: n?.estado === 'ok' || n?.estado === 'no_conectado' ? chipEstado(validado(n)) : '' })}<div class="sec">${seg('preiva')}${cuerpo}</div>`;
+  return html`${sub(titulo, { chip: n?.estado === 'ok' || n?.estado === 'no_conectado' ? chipEstado(validado(n)) : '' })}<div class="sec">${seg('preiva', ctx.anualOk === true)}${cuerpo}</div>`;
 }
 
 /** Tarjeta del Inicio con el total del mes (solo con datos del SII). */

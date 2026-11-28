@@ -5,6 +5,7 @@ import { datosDe, saldoFavorTexto, planTexto } from './datos.js';
 import { sub, teaser, vacio, paso, waCard, chipEstadoProy, leyendaEstados, botonSolicitud } from './vistas-comunes.js';
 import { bloqueTerminosAceptados, DIAGNOSTICO_NOMBRE } from './vistas-apertura.js';
 import { tarjetaAvisos } from './vistas-avisos.js';
+import { seg } from './vistas-impuestos.js';
 
 const CHIP_VENCE = { por_vencer: 'c-pend', vencida: 'c-venc' };
 
@@ -63,9 +64,7 @@ export function vPago(ctx, id) {
   </div><p class="xs c">Los recordatorios de este vencimiento se detuvieron al registrar el pago.</p></div>`;
 }
 
-function segProy(actual) {
-  return html`<div class="seg" role="group" aria-label="Proyecciones"><button type="button" data-ir="preiva" class="${actual === 'preiva' ? 'on' : ''}" aria-pressed="${actual === 'preiva'}">Pre-IVA</button><button type="button" data-ir="prerenta" class="${actual === 'prerenta' ? 'on' : ''}" aria-pressed="${actual === 'prerenta'}">Pre-Renta</button></div>`;
-}
+function segProy(actual, conAnio = false) { return seg(actual, conAnio); }
 
 export function vPreIva(ctx) {
   const e = ctx.perm.preIva; const d = datosDe(ctx.resumen, 'pre_iva');
@@ -77,7 +76,7 @@ export function vPreIva(ctx) {
     <div class="card"><h3 class="t15">Cómo se calcula</h3>${(d.calculo || []).map(paso)}<div class="total-l"><span>Total estimado a pagar</span><span>${clp(d.estimado, { aprox: true })}</span></div></div>
     ${d.consejo ? html`<div class="nota"><b>Lo que te conviene saber</b><div class="cuerpo">${d.consejo}</div></div>` : ''}
     ${leyendaEstados}<p class="xs c">El monto final es el del F29 que te confirmamos en tu reporte.</p>`;
-  return html`${sub('Pre-IVA', { chip: d ? chipEstadoProy(d.estado) : '' })}<div class="sec">${segProy('preiva')}${cuerpo}</div>`;
+  return html`${sub('Pre-IVA', { chip: d ? chipEstadoProy(d.estado) : '' })}<div class="sec">${segProy('preiva', ctx.anualOk === true)}${cuerpo}</div>`;
 }
 
 export function vPreRenta(ctx) {
@@ -93,7 +92,7 @@ export function vPreRenta(ctx) {
       <div class="mt12"><div class="xs fila"><span>Meses contabilizados</span><b>${d.meses_contabilizados} de 12</b></div><div class="prog"><i data-w="${pct((d.meses_contabilizados / 12) * 100)}"></i></div></div></div>
     ${d.anteriores?.length ? html`<div class="card"><h3 class="t15">Tus rentas anteriores</h3>${d.anteriores.map((a) => html`<div class="fila"><span>${a.at}</span><b>${clp(a.monto)}</b></div>`)}<div class="fila"><b class="cifra">AT ${d.anio_tributario} (proyección)</b><b>${clp(d.impuesto, { aprox: true })}</b></div></div>` : ''}
     ${d.nota ? html`<div class="nota">${d.nota}</div>` : ''}`;
-  return html`${sub('Pre-Renta', { chip: d ? html`<span class="chip c-proy">AT ${d.anio_tributario}</span>` : '' })}<div class="sec">${segProy('prerenta')}${cuerpo}</div>`;
+  return html`${sub('Pre-Renta', { chip: d ? html`<span class="chip c-proy">AT ${d.anio_tributario}</span>` : '' })}<div class="sec">${segProy('prerenta', ctx.anualOk === true)}${cuerpo}</div>`;
 }
 
 export function vTrabajos(ctx) {

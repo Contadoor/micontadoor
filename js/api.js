@@ -153,6 +153,13 @@ export function crearApiReal(cfg) {
       return rpc(cfg.RPC.TRABAJOS, { p_ref: ref, p_codigo: codigo });
     },
     /** MC-IMP-1: «Tu IVA del mes». null si la RPC no está configurada. p_periodo 'AAAA-MM' o null (= mes anterior). */
+    /** «Tu año con el SII» (mc.mis_impuestos_anio). null si la RPC no está configurada. anio = año actual o el anterior. */
+    async impuestosAnio(ref, anio = null) {
+      if (!cfg.RPC.HISTORIAL_IMPUESTOS) return null;
+      if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
+      if (anio !== null && !(Number.isInteger(anio) && anio >= 2020 && anio <= 2100)) throw new ErrorApi('MC_DATOS');
+      return rpc(cfg.RPC.HISTORIAL_IMPUESTOS, { p_ref: ref, p_anio: anio });
+    },
     async impuestos(ref, periodo = null) {
       if (!cfg.RPC.IMPUESTOS) return null;
       if (!UUID.test(ref)) throw new ErrorApi('MC_SIN_ACCESO');
@@ -208,7 +215,7 @@ export function crearApiDemo(demo, opciones = {}) {
   const soporte = demo.soporteNuevo();
   return {
     modo: 'demo',
-    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: false,
+    capacidades: { solicitudPago: opciones.solicitudes === true, terminosServidor: true, misTerminos: true, soporte: true, incorporacion: true, historialImpuestos: true,
       // MC-6: en la demo hay Novedades siempre; el push se SIMULA (opciones.avisos = inactivo | activo | bloqueado | ios | no_soportado).
       novedades: true, push: true, pushDemo: opciones.avisos || 'inactivo' },
     tieneSesion: () => dentro,
@@ -245,6 +252,12 @@ export function crearApiDemo(demo, opciones = {}) {
     async trabajos(ref) {
       const r = demo.trabajos(ref, opciones);
       if (!r) throw new ErrorApi('MC_SIN_ACCESO');
+      return espera(r);
+    },
+    async impuestosAnio(ref, anio = null) {
+      const r = demo.impuestosAnio(ref, anio);
+      if (!r) throw new ErrorApi('MC_SIN_ACCESO');
+      if (r.ok === false) throw new ErrorApi(r.codigo);
       return espera(r);
     },
     async impuestos(ref) {

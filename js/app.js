@@ -2,13 +2,14 @@
 import { CONFIG } from './config.js';
 import { crearApiReal, crearApiDemo } from './api.js';
 import { demo } from './demo.js';
-import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte, normalizarAvisos } from './datos.js';
+import { permisos, mensajeError, validarContrasena, conTrabajos, conReporte, normalizarImpuestos, normalizarImpuestosAnio, normalizarTerminos, normalizarMisTerminos, normalizarSolicitudes, normalizarIncorporacion, validarSoporte, normalizarAvisos } from './datos.js';
 import { html, urlSegura, CORREO, sha256Hex, UUID } from './util.js';
 import { vIngreso, vRecuperar, vActivar, vTerminos, vFuera } from './vistas-acceso.js';
 import { tabs } from './vistas-comunes.js';
 import { vInicio, vReporte, vHistorial } from './vistas-reporte.js';
 import { vCuenta, vPago, vPreIva, vPreRenta, vTrabajos, vMas, vAcceso, hojaEmpresas, hojaSolicitud } from './vistas-cuenta.js';
 import { vImpuestos } from './vistas-impuestos.js';
+import { vAnio } from './vistas-anio.js';
 import { vTerminosServidor, vAyuda, vIncorporacion, hojaTerminos } from './vistas-apertura.js';
 import { registrarServiceWorker, estadoActual, activarAvisos, desactivarAvisos } from './push.js';
 import { vNovedades } from './vistas-avisos.js';
@@ -21,7 +22,7 @@ const q = new URLSearchParams(location.search);
 const esDemo = q.get('demo') === '1';
 
 const st = {
-  api: null, sesion: null, empresa: null, resumen: null, perm: null, impuestos: null, cargadoAt: 0,
+  api: null, sesion: null, empresa: null, resumen: null, perm: null, impuestos: null, anual: null, cargadoAt: 0,
   mensaje: null, flash: null, tipoEnlace: 'invite', activado: false, enlacePendiente: null,
   abiertos: new Set(), solicitudes: new Set(), hoja: null, rutaPrevia: '',
   // MICONTADOOR-APERTURA: términos del servidor, incorporación, cargas por ruta (Mi acceso, Ayuda) y el formulario de soporte
@@ -60,6 +61,20 @@ const WA_MEJORA = wa(CONFIG.WHATSAPP_COMERCIAL, 'Hola Contadoor 👋 Quiero sabe
 const WA_EQUIPO = wa(CONFIG.WHATSAPP_EQUIPO, 'Hola Contadoor 👋 Te escribo desde MiContadoor.');
 const WA_AYUDA = wa(CONFIG.WHATSAPP_EQUIPO, 'Hola Contadoor 👋 Necesito ayuda con MiContadoor.');   // sin datos personales ni montos
 
+// «Tu año con el SII» (mc.mis_impuestos_anio): mismo permiso de sección que «Tu IVA del mes».
+function anualDisponible() { return !!(st.api?.capacidades?.historialImpuestos && st.api.impuestosAnio && st.perm && st.perm.preIva !== 'sin_permiso'); }
+function cargarAnual(anio) {
+  const ref = st.empresa.ref; const marca = {};
+  st.anual = { ref, anio, n: { estado: 'cargando' }, marca };
+  st.api.impuestosAnio(ref, anio)
+    .then((j) => { if (st.anual?.marca !== marca) return; st.anual.n = j ? normalizarImpuestosAnio(j) : null; if (st.anual.n?.anio) st.anual.anio = st.anual.n.anio; pintar(); })
+    .catch(async (e) => {
+      if (st.anual?.marca !== marca) return;
+      if (['MC_SESION_INVALIDA', 'MC_BLOQUEADO'].includes(e?.codigo)) { await manejarError(e); return; }
+      st.anual.n = { estado: 'error' }; pintar();
+    });
+}
+
 function ctx() {
   return {
     cfg: CONFIG, api: st.api, sesion: st.sesion, empresa: st.empresa, resumen: st.resumen, perm: st.perm, impuestos: st.impuestos, tema, version: VERSION,
@@ -67,6 +82,7 @@ function ctx() {
     incorporacion: st.incorporacion, misTerminos: st.cache.misTerminos,
     enlaceDoc: (u) => urlSegura(u, CONFIG.HOSTS_DOCUMENTOS),
     avisos: st.avisos, pushEstado: st.pushEstado,
+    anualOk: anualDisponible(), anioPedido: st.anual?.anio ?? null,
   };
 }
 
@@ -79,6 +95,11 @@ function vista(r, a) {
     case 'cuenta': return vCuenta(c, a);
     case 'pago': return vPago(c, a);
     case 'preiva': return st.impuestos ? vImpuestos(c, st.impuestos) : vPreIva(c);
+    case 'impuestos-historial': {   // «Tu año con el SII» + gráficos: se carga al entrar (una vez por empresa y año)
+      if (!anualDisponible()) return vAnio(c, null);
+      if (!st.anual || st.anual.ref !== st.empresa.ref) cargarAnual(null);
+      return vAnio(c, st.anual.n);
+    }
     case 'prerenta': return vPreRenta(c);
     case 'trabajos': return vTrabajos(c);
     case 'mas': return vMas(c);
@@ -280,13 +301,14 @@ document.addEventListener('click', async (ev) => {
   const a = ev.target.closest('[data-accion]');
   if (!a) return;
   const acc = a.dataset.accion;
+  if (acc === 'anio') { const y = Number(a.dataset.anio); if (Number.isInteger(y) && anualDisponible()) { cargarAnual(y); pintar(); } return; }
   if (acc === 'cerrar-guia-ios') { cerrarGuia(); if (esDemo) q.delete('ios'); pintar(); return; }
   if (acc === 'cerrar-hoja') { if (ev.target === a || a.tagName === 'BUTTON') { st.hoja = null; pintar(); } return; }
   if (acc === 'empresas') { st.hoja = () => hojaEmpresas(ctx()); pintar(); return; }
   if (acc === 'elegir') {
     const e = st.sesion.empresas.find((x) => x.ref === a.dataset.ref);
     if (!e) return;
-    st.hoja = null; st.empresa = e; st.abiertos.clear();
+    st.hoja = null; st.empresa = e; st.abiertos.clear(); st.anual = null;
     try { await cargarResumen(); ir('inicio'); } catch (er) { await manejarError(er); }
     return;
   }
@@ -347,7 +369,7 @@ document.addEventListener('click', async (ev) => {
     // MC-6: al salir, este aparato deja de recibir avisos (celular compartido); «en todos» los apaga en todos los aparatos.
     if (st.api.modo !== 'demo' && st.api.capacidades?.push) await desactivarAvisos(st.api, { todas: acc === 'salir-todos' });
     await st.api.salir({ todos: acc === 'salir-todos' });
-    st.sesion = null; st.empresa = null; st.resumen = null; st.perm = null; st.hoja = null; st.avisos = null; limpiarApertura();
+    st.sesion = null; st.empresa = null; st.resumen = null; st.perm = null; st.hoja = null; st.avisos = null; st.anual = null; limpiarApertura();
     st.mensaje = { ok: true, texto: 'Cerraste tu sesión.' }; ir('ingreso');
   }
 });

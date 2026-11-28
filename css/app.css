@@ -353,3 +353,40 @@ a.btn{color:#fff}
 .guia-ios-cerrar{margin-top:6px;width:auto;padding:6px 14px;font-size:13px}
 #avisos .xs svg{width:14px;height:14px;vertical-align:-2px;margin-right:2px}
 .correo-av{border-top:1px solid var(--borde)}
+
+
+/* «Tu año con el SII» (REPORTE-HISTORIAL-SII, 24-11-2026) · mismas piezas del portal: tarjeta morada, filas, chips */
+.seg.mb{margin-bottom:12px}
+.sec>.card.an-lista,.sec>.card.an-ley{grid-column:1/-1}
+.an-mes{border-top:1px solid var(--borde)}
+.an-mes:first-of-type{border-top:0}
+.an-cab{display:flex;align-items:center;gap:10px;padding:12px 0;min-height:44px;cursor:pointer;list-style:none}
+.an-cab::-webkit-details-marker{display:none}
+.an-cab>b{flex:1;font-weight:700;font-size:14.5px}
+.an-cab .an-tot{font-family:Montserrat,sans-serif;font-weight:800;white-space:nowrap}
+.an-mes.fut .an-cab{cursor:default;color:var(--t2)}
+.an-mes.fut .an-cab>b{font-weight:600}
+details.an-mes .an-cab::after{content:"";width:8px;height:8px;border-right:2px solid var(--t2);border-bottom:2px solid var(--t2);transform:rotate(45deg);margin:-4px 2px 0 2px;flex:none}
+details.an-mes[open] .an-cab::after{transform:rotate(-135deg);margin-top:4px}
+.an-det{padding:0 0 12px}
+.an-det .fila{padding:8px 0;font-size:13.5px}
+.an-ley .estados{display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--t2)}
+.an-ley .estados .chip{margin-right:6px}
+@media (min-width:900px){
+  .an-lista{columns:2;column-gap:28px}
+  .an-lista .hd{column-span:all}
+  .an-mes{break-inside:avoid}
+}
+
+/* Gráficos «Tu año» (28-11): ventas vs. compras y diferencia */
+.negocio .graf{width:100%;height:auto;display:block;margin:6px 0 10px}
+.graf .g-v,.leyenda .g-v{fill:#924893;background:#924893}
+.graf .g-c,.leyenda .g-c{fill:#4FB8E0;background:#4FB8E0}
+.graf .g-pos{fill:#3FAF7E}.graf .g-neg{fill:#E07A6E}
+.graf .parcial{opacity:.5}
+.graf .g-base{stroke:var(--borde);stroke-width:1}
+.graf .g-eje{fill:var(--t2);font:600 9.5px Inter,sans-serif}
+[data-tema="oscuro"] .graf .g-v,[data-tema="oscuro"] .leyenda .g-v{fill:#C77BC9;background:#C77BC9}
+.leyenda{display:flex;gap:14px;font-size:12px;color:var(--t2);margin-top:2px}
+.leyenda .pt{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+b.rojo{color:#E07A6E}
